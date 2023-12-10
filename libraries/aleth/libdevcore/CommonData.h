@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <numeric>
 #include <string>
 #include <type_traits>
 #include <unordered_set>
