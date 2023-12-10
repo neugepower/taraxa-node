@@ -536,3 +536,16 @@ TEST_F(SortitionTest, params_restart) {
 }
 
 }  // namespace taraxa::core_tests
+
+using namespace taraxa;
+int main(int argc, char** argv) {
+  taraxa::static_init();
+
+  auto logging = logger::createDefaultLoggingConfig();
+  logging.verbosity = logger::Verbosity::Error;
+  addr_t node_addr;
+  logging.InitLogging(node_addr);
+
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}

@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include "common/static_init.hpp"
+
 namespace taraxa::core_tests {
 
 // Do not use NodesTest from "test_util/gtest.hpp" as its functionality is not needed in this test
@@ -63,3 +65,16 @@ TEST_F(GasPricerTest, random_test) {
 }
 
 }  // namespace taraxa::core_tests
+
+using namespace taraxa;
+int main(int argc, char** argv) {
+  taraxa::static_init();
+
+  auto logging = logger::createDefaultLoggingConfig();
+  logging.verbosity = logger::Verbosity::Error;
+  addr_t node_addr;
+  logging.InitLogging(node_addr);
+
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
