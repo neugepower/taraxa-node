@@ -11,7 +11,6 @@ else ()
             --error-exitcode=1
             --enable=all
             --suppress=missingInclude
-            --suppress=missingIncludeSystem
             # find_if - useless here
             --suppress=useStlAlgorithm:${PROJECT_SOURCE_DIR}/*/pbft_sync_packet_handler.cpp
             --suppress=noExplicitConstructor
@@ -39,8 +38,6 @@ else ()
             --suppress=cstyleCast:${PROJECT_SOURCE_DIR}/*/Common.h
             # not an issue here
             --suppress=virtualCallInConstructor:${PROJECT_SOURCE_DIR}/*/final_chain.cpp
-            # just a warning
-            --suppress=duplInheritedMember:${PROJECT_SOURCE_DIR}/*/FixedHash.h
             # Only show found errors
             "--quiet"
 
