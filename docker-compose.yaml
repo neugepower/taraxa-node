@@ -1,0 +1,18 @@
+version: '3'
+services:
+  builder:
+    image: taraxa-builder
+    pull_policy: never
+    build:
+      dockerfile: Dockerfile.builder
+      context: .
+    volumes:
+      - .:/workarea
+    working_dir: /buildarea
+    command: [
+      "cmake",
+      "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+      "-DTARAXA_ENABLE_LTO=OFF",
+      "-DTARAXA_STATIC_BUILD=OFF",
+      "/workarea"
+    ]
