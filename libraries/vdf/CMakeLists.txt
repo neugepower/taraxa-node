@@ -14,6 +14,7 @@ target_link_libraries(vdf PUBLIC
     logger
     taraxa-vdf
     ${MPFR_LIBRARIES}
+    ${GMP_LIBRARIES}
 )
 
 install(TARGETS vdf
