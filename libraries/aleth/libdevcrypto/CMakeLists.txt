@@ -4,4 +4,4 @@ file(GLOB HEADERS "*.h")
 add_library(devcrypto ${SOURCES} ${HEADERS})
 target_include_directories(devcrypto PUBLIC ${UTILS_INCLUDE_DIR} ${GMP_INCLUDES})
 
-target_link_libraries(devcrypto PUBLIC devcore Secp256k1 ff ${CRYPTOCPP_LIBRARIES} ${GMP_LIBRARIES})
+target_link_libraries(devcrypto PUBLIC devcore Secp256k1 ff ${CRYPTOCPP_LINK_LIBRARIES} ${GMP_LIBRARIES})

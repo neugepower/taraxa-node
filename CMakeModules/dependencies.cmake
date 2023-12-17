@@ -1,13 +1,14 @@
+find_package(PkgConfig REQUIRED)
+
 # find and include system libraries used in submodules and libraries
 find_package(OpenSSL REQUIRED)
 find_package(GMP REQUIRED)
 find_package(MPFR REQUIRED)
-find_package(jsoncpp REQUIRED)
 find_package(prometheus-cpp REQUIRED)
 
-find_package(PkgConfig REQUIRED)
 pkg_check_modules(LZ4 REQUIRED liblz4)
-pkg_check_modules(CRYPTOCPP REQUIRED libcrypto++)
+pkg_check_modules(CRYPTOCPP REQUIRED libcryptopp)
+pkg_check_modules(JSONCPP REQUIRED jsoncpp)
 
 include(FetchContent)
 
@@ -72,6 +73,8 @@ unset(GRAPHQL_BUILD_CLIENTGEN CACHE)
 set(WITH_LZ4 ON CACHE INTERNAL "")
 set(USE_RTTI ON CACHE INTERNAL "")
 set(FAIL_ON_WARNINGS OFF CACHE INTERNAL "")
+set(WITH_TESTS OFF CACHE INTERNAL "")
+set(WITH_BENCHMARK_TOOLS OFF CACHE INTERNAL "")
 
 FetchContent_Declare(
   RocksDB
@@ -85,6 +88,8 @@ FetchContent_MakeAvailable(RocksDB)
 unset(WITH_LZ4 CACHE)
 unset(USE_RTTI CACHE)
 unset(FAIL_ON_WARNINGS CACHE)
+unset(WITH_TESTS CACHE)
+unset(WITH_BENCHMARK_TOOLS CACHE)
 
 # other external dependencies
 include(ProjectJSONRPCCPP)

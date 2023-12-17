@@ -29,7 +29,7 @@ target_link_libraries(common PUBLIC
     devcore
     taraxa-vrf
     OpenSSL::SSL
-    jsoncpp
+    ${JSONCPP_LINK_LIBRARIES}
     Boost::asio
     Boost::format
     Boost::iostreams
