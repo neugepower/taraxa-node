@@ -7,8 +7,12 @@ find_package(MPFR REQUIRED)
 find_package(prometheus-cpp REQUIRED)
 
 pkg_check_modules(LZ4 REQUIRED liblz4)
-pkg_check_modules(CRYPTOCPP REQUIRED libcryptopp)
 pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+if(APPLE)
+  pkg_check_modules(CRYPTOCPP REQUIRED libcryptopp)
+else()
+  pkg_check_modules(CRYPTOCPP REQUIRED libcrypto++)
+endif()
 
 include(FetchContent)
 
