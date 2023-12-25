@@ -105,5 +105,13 @@ unset(WITH_TRACE_TOOLS CACHE)
 unset(WITH_TESTS CACHE)
 unset(WITH_BENCHMARK_TOOLS CACHE)
 
+# Corrision
+FetchContent_Declare(
+    Corrosion
+    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+    GIT_TAG v0.4.5)
+
+FetchContent_MakeAvailable(Corrosion)
+
 # other external dependencies
 include(ProjectJSONRPCCPP)
