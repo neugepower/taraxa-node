@@ -178,9 +178,6 @@ include(CMakeModules/git_info.cmake)
 
 include(dependencies)
 
-# rocksdb build
-include(${PROJECT_SOURCE_DIR}/CMakeModules/rocksdb.cmake)
-
 # Add sub-directories cmakes
 add_subdirectory(submodules)
 add_subdirectory(libraries)
