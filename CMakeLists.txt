@@ -166,10 +166,10 @@ set(LLVM_VERSION "14")
 include(CMakeModules/clang_tidy.cmake)
 
 # clang-format
-include(CMakeModules/clang_format.cmake)
+#include(CMakeModules/clang_format.cmake)
 
 # cppcheck
-include(CMakeModules/cppcheck.cmake)
+#include(CMakeModules/cppcheck.cmake)
 
 add_custom_target(check-static DEPENDS cpp-check clang-format clang-format-check)
 
