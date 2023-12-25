@@ -12,7 +12,7 @@ set(SOURCES
 
 add_library(cli ${SOURCES} ${HEADERS})
 target_include_directories(cli PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(cli PUBLIC config)
+target_link_libraries(cli PUBLIC config Boost::program_options)
 
 install(TARGETS cli
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -34,8 +34,8 @@ function(CHECK_JSON CONFIG_VAR_NAME FILE_PATH SEARCH_MEMBER)
   file(READ ${FILE_PATH} ${CONFIG_VAR_NAME})
   set(CONFIG_STR ${${CONFIG_VAR_NAME}})
   set(${CONFIG_VAR_NAME} ${${CONFIG_VAR_NAME}} PARENT_SCOPE)
-  
-  # check json format. we are getting type of `SEARCH_MEMBER` field here, 
+
+  # check json format. we are getting type of `SEARCH_MEMBER` field here,
   # but if we will have any issue with json format it will be reported to `JSON_ERROR` variable
   string(JSON result ERROR_VARIABLE JSON_ERROR TYPE ${CONFIG_STR} ${SEARCH_MEMBER})
   if(NOT(${result} STREQUAL "OBJECT"))
@@ -43,7 +43,7 @@ function(CHECK_JSON CONFIG_VAR_NAME FILE_PATH SEARCH_MEMBER)
   endif()
 endfunction()
 
-# this helps to trigger configuration step after change of JSON conffiguration files 
+# this helps to trigger configuration step after change of JSON conffiguration files
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${config_directories})
 
 list(LENGTH configs configs_count)

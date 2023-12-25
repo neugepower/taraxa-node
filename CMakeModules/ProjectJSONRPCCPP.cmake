@@ -1,3 +1,5 @@
+include(ExternalProject)
+
 set(prefix "${CMAKE_BINARY_DIR}/deps")
 set(lib_path "${prefix}/lib")
 set(include_path "${prefix}/include")

@@ -49,6 +49,9 @@ target_include_directories(core_libs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(core_libs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/network/graphql/gen)
 target_include_directories(core_libs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/network/graphql/include)
 
+# Needed for 'rocksdb/c.h'
+target_include_directories(core_libs PUBLIC ${rocksdb_SOURCE_DIR}/include)
+
 target_link_libraries(core_libs PUBLIC
   cli
   pbft_block
@@ -57,7 +60,9 @@ target_link_libraries(core_libs PUBLIC
   metrics
   Jsonrpccpp
   rocksdb
-
+  Boost::graph
+  Boost::circular_buffer
+  Boost::beast
   # GraphQL
   cppgraphqlgen::graphqlservice
   cppgraphqlgen::graphqljson
