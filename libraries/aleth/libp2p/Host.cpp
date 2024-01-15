@@ -93,7 +93,7 @@ Host::Host(std::string _clientVersion, KeyPair const& kp, NetworkConfig _n, Tara
       m_nodeTable->addNode(*peer);
     }
   }
-  LOG(m_logger) << "devp2p started. Node id: " << id();
+  LOG_ALETH(m_logger) << "devp2p started. Node id: " << id();
   //!!! this needs to be post to session_ioc_ as main_loop_body handles peer/session related stuff
   // and it should not be execute for bootnodes, but it needs to bind with strand_
   // as it touching same structures as discovery part !!!
@@ -313,7 +313,7 @@ void Host::startPeerSession(Public const& _id, RLP const& _hello, unique_ptr<RLP
                                disconnect_reason);
   if (!disconnect_reason) {
     m_sessions[_id] = session;
-    LOG(m_logger) << "Peer connection successfully established with " << _id << "@" << _s->remoteEndpoint();
+    LOG_ALETH(m_logger) << "Peer connection successfully established with " << _id << "@" << _s->remoteEndpoint();
   }
 }
 
@@ -331,7 +331,7 @@ shared_ptr<Session> Host::peerSession(NodeID const& _id) const {
 
 void Host::onNodeTableEvent(NodeID const& _n, NodeTableEventType const& _e) {
   if (_e == NodeEntryAdded) {
-    LOG(m_logger) << "p2p.host.nodeTable.events.nodeEntryAdded " << _n;
+    LOG_ALETH(m_logger) << "p2p.host.nodeTable.events.nodeEntryAdded " << _n;
     if (Node n = nodeFromNodeTable(_n)) {
       shared_ptr<Peer> p;
       if (m_peers.contains(_n)) {
@@ -340,12 +340,12 @@ void Host::onNodeTableEvent(NodeID const& _n, NodeTableEventType const& _e) {
       } else {
         p = make_shared<Peer>(n);
         m_peers[_n] = p;
-        LOG(m_logger) << "p2p.host.peers.events.peerAdded " << _n << " " << p->get_endpoint();
+        LOG_ALETH(m_logger) << "p2p.host.peers.events.peerAdded " << _n << " " << p->get_endpoint();
       }
       if (peerSlotsAvailable(Egress)) connect(p);
     }
   } else if (_e == NodeEntryDropped) {
-    LOG(m_logger) << "p2p.host.nodeTable.events.NodeEntryDropped " << _n;
+    LOG_ALETH(m_logger) << "p2p.host.nodeTable.events.NodeEntryDropped " << _n;
     if (m_peers.contains(_n) && m_peers[_n]->peerType == PeerType::Optional) m_peers.erase(_n);
   }
 }
@@ -407,7 +407,7 @@ ENR Host::updateENR(ENR const& _restoredENR, bi::tcp::endpoint const& _tcpPublic
     return _restoredENR;
 
   auto newENR = IdentitySchemeV4::updateENR(_restoredENR, m_alias.secret(), address, _listenPort, _listenPort);
-  LOG(m_infoLogger) << "ENR updated: " << newENR;
+  LOG_ALETH(m_infoLogger) << "ENR updated: " << newENR;
 
   return newENR;
 }
@@ -588,10 +588,10 @@ void Host::logActivePeers() {
     return;
   }
 
-  LOG(m_infoLogger) << "Active peer count: " << peer_count_();
-  if (m_netConfig.discovery) LOG(m_infoLogger) << "Looking for peers...";
+  LOG_ALETH(m_infoLogger) << "Active peer count: " << peer_count_();
+  if (m_netConfig.discovery) LOG_ALETH(m_infoLogger) << "Looking for peers...";
 
-  LOG(m_logger) << "Peers: " << peerSessionInfos();
+  LOG_ALETH(m_logger) << "Peers: " << peerSessionInfos();
   m_lastPeerLogMessage = chrono::steady_clock::now();
 }
 

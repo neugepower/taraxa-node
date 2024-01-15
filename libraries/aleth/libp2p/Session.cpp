@@ -74,7 +74,7 @@ void Session::readPacket(unsigned _packetType, RLP const& _r) {
   }
   auto cap = capabilityFor(_packetType);
   auto packet_type_str = capabilityPacketTypeToString(cap, _packetType);
-  LOG(m_netLoggerDetail) << "Received " << packet_type_str << " (" << _packetType << ") from";
+  LOG_ALETH(m_netLoggerDetail) << "Received " << packet_type_str << " (" << _packetType << ") from";
   if (_packetType < UserPacket) {
     string err_msg;
     try {
@@ -85,14 +85,14 @@ void Session::readPacket(unsigned _packetType, RLP const& _r) {
       err_msg = e.what();
     }
     if (!err_msg.empty()) {
-      LOG(m_netLogger) << "Exception caught in p2p::Session::interpretP2pPacket(): " << err_msg
+      LOG_ALETH(m_netLogger) << "Exception caught in p2p::Session::interpretP2pPacket(): " << err_msg
                        << ". PacketType: " << packet_type_str << " (" << _packetType << "). RLP: " << _r;
       disconnect_(BadProtocol);
     }
     return;
   }
   if (!cap) {
-    LOG(m_netLogger) << "Disconnecting cause no capability for packet type: " << _packetType;
+    LOG_ALETH(m_netLogger) << "Disconnecting cause no capability for packet type: " << _packetType;
     disconnect_(BadProtocol);
     return;
   }
@@ -100,7 +100,7 @@ void Session::readPacket(unsigned _packetType, RLP const& _r) {
 }
 
 void Session::interpretP2pPacket(P2pPacketType _t, RLP const& _r) {
-  LOG(m_capLoggerDetail) << p2pPacketTypeToString(_t) << " from";
+  LOG_ALETH(m_capLoggerDetail) << p2pPacketTypeToString(_t) << " from";
   switch (_t) {
     case DisconnectPacket: {
       string reason = "Unspecified";
@@ -109,13 +109,13 @@ void Session::interpretP2pPacket(P2pPacketType _t, RLP const& _r) {
         drop(BadProtocol);
       else {
         reason = reasonOf(r);
-        LOG(m_capLogger) << "Disconnect (reason: " << reason << ") from";
+        LOG_ALETH(m_capLogger) << "Disconnect (reason: " << reason << ") from";
         drop(DisconnectRequested);
       }
       break;
     }
     case PingPacket: {
-      LOG(m_capLoggerDetail) << "Pong to";
+      LOG_ALETH(m_capLoggerDetail) << "Pong to";
       RLPStream s;
       sealAndSend_(prep(s, PongPacket));
       break;
@@ -123,7 +123,7 @@ void Session::interpretP2pPacket(P2pPacketType _t, RLP const& _r) {
     case PongPacket: {
       std::unique_lock l(x_info);
       m_info.lastPing = std::chrono::steady_clock::now() - m_ping;
-      LOG(m_capLoggerDetail) << "Ping latency: " << chrono::duration_cast<chrono::milliseconds>(m_info.lastPing).count()
+      LOG_ALETH(m_capLoggerDetail) << "Ping latency: " << chrono::duration_cast<chrono::milliseconds>(m_info.lastPing).count()
                              << " ms";
       break;
     }
@@ -162,7 +162,7 @@ bool Session::checkPacket(bytesConstRef _msg) {
 }
 
 void Session::send_(bytes _msg, std::function<void()> on_done) {
-  LOG(m_netLoggerDetail) << capabilityPacketTypeToString(_msg[0]) << " to";
+  LOG_ALETH(m_netLoggerDetail) << capabilityPacketTypeToString(_msg[0]) << " to";
   if (!checkPacket(&_msg)) {
     clog(VerbosityError, "net") << "Invalid packet constructed. Size: " << _msg.size()
                                 << " bytes, message: " << toHex(_msg);
@@ -219,7 +219,7 @@ void Session::write(uint16_t sequence_id, uint32_t sent_size) {
                     // must check queue, as write callback can occur following
                     // dropped()
                     if (ec) [[unlikely]] {
-                      LOG(m_netLogger) << "Error sending: " << ec.message();
+                      LOG_ALETH(m_netLogger) << "Error sending: " << ec.message();
                       drop(TCPError);
                       return;
                     }
@@ -252,7 +252,7 @@ void Session::drop(DisconnectReason _reason) {
   if (socket.is_open()) {
     try {
       boost::system::error_code ec;
-      LOG(m_netLoggerDetail) << "Closing (" << reasonOf(_reason) << ") connection with";
+      LOG_ALETH(m_netLoggerDetail) << "Closing (" << reasonOf(_reason) << ") connection with";
       socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
       socket.close();
     } catch (...) {
@@ -288,7 +288,7 @@ void Session::doRead() {
           return;
         }
         if (!m_io->authAndDecryptHeader(bytesRef(m_data.data(), length))) {
-          LOG(m_netLogger) << "Header decrypt failed";
+          LOG_ALETH(m_netLogger) << "Header decrypt failed";
           drop(BadProtocol);  // todo: better error
           return;
         }
@@ -308,7 +308,7 @@ void Session::doRead() {
           hSequenceId = header.sequenceId;
           hTotalLength = header.totalLength;
         } catch (std::exception const& _e) {
-          LOG(m_netLogger) << "Exception decoding frame header RLP: " << _e.what() << " "
+          LOG_ALETH(m_netLogger) << "Exception decoding frame header RLP: " << _e.what() << " "
                            << bytesConstRef(m_data.data(), h128::size).cropped(3);
           drop(BadProtocol);
           return;
@@ -327,7 +327,7 @@ void Session::doRead() {
                 return;
               }
               if (!m_io->authAndDecryptFrame(bytesRef(m_data.data(), tlen))) {
-                LOG(m_netLogger) << "Frame decrypt failed";
+                LOG_ALETH(m_netLogger) << "Frame decrypt failed";
                 drop(BadProtocol);  // todo: better error
                 return;
               }
@@ -335,7 +335,7 @@ void Session::doRead() {
               if (hProtocolId) {
                 packet_lenght = m_io->decompressFrame(bytesRef(m_data.data(), hLength), m_data);
                 if (packet_lenght <= 0) [[unlikely]] {
-                  LOG(m_netLogger) << "Frame decompress failed";
+                  LOG_ALETH(m_netLogger) << "Frame decompress failed";
                   drop(BadProtocol);
                   return;
                 }
@@ -350,7 +350,7 @@ void Session::doRead() {
                       static_cast<P2pPacketType>(RLP(frame.cropped(0, 1), RLP::LaissezFaire).toInt<unsigned>());
                   if (!checkPacket(frame)) {
                     auto packet_type_str = capabilityPacketTypeToString(capabilityFor(packetType), packetType);
-                    LOG(m_netLogger) << "Received invalid packet. Packet type (possibly "
+                    LOG_ALETH(m_netLogger) << "Received invalid packet. Packet type (possibly "
                                         "corrupted): "
                                      << packetType << " (" << packet_type_str << ")."
                                      << "Frame Size: " << frame.size() << ". Size encoded in RLP: "
@@ -368,7 +368,7 @@ void Session::doRead() {
                     static_cast<P2pPacketType>(RLP(frame.cropped(0, 1), RLP::LaissezFaire).toInt<unsigned>());
                 if (!checkPacket(frame)) {
                   auto packet_type_str = capabilityPacketTypeToString(capabilityFor(packetType), packetType);
-                  LOG(m_netLogger) << "Received invalid packet. Packet type (possibly "
+                  LOG_ALETH(m_netLogger) << "Received invalid packet. Packet type (possibly "
                                       "corrupted): "
                                    << packetType << " (" << packet_type_str << ")."
                                    << "Frame Size: " << frame.size()
@@ -386,19 +386,19 @@ void Session::doRead() {
 
 bool Session::checkRead(std::size_t expected, boost::system::error_code ec, std::size_t length) {
   if (ec && ec.category() != boost::asio::error::get_misc_category() && ec.value() != boost::asio::error::eof) {
-    LOG(m_netLogger) << "Error reading: " << ec.message();
+    LOG_ALETH(m_netLogger) << "Error reading: " << ec.message();
     drop(TCPError);
     return false;
   }
   if (ec && length < expected) {
-    LOG(m_netLogger) << "Error reading - Abrupt peer disconnect: " << ec.message();
+    LOG_ALETH(m_netLogger) << "Error reading - Abrupt peer disconnect: " << ec.message();
     drop(TCPError);
     return false;
   }
   if (length != expected) {
     // with static m_data-sized buffer this shouldn't happen unless there's a
     // regression sec recommends checking anyways (instead of assert)
-    LOG(m_netLoggerError) << "Error reading - TCP read buffer length differs "
+    LOG_ALETH(m_netLoggerError) << "Error reading - TCP read buffer length differs "
                              "from expected frame size ("
                           << length << " != " << expected << ")";
     disconnect_(UserReason);

@@ -40,7 +40,7 @@ namespace dev {
 /// information that musl doesn't currently implement 'pthread_setname_np'
 /// https://marc.info/?l=musl&m=146171729013062&w=1
 ///
-#define LOG BOOST_LOG
+#define LOG_ALETH BOOST_LOG
 
 enum Verbosity {
   VerbositySilent = -1,
@@ -56,27 +56,27 @@ enum Verbosity {
 BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(
     g_errorLogger, boost::log::sources::severity_channel_logger_mt<>,
     (boost::log::keywords::severity = VerbosityError)(boost::log::keywords::channel = "error"))
-#define cerror LOG(dev::g_errorLogger::get())
+#define cerror LOG_ALETH(dev::g_errorLogger::get())
 
 BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(
     g_warnLogger, boost::log::sources::severity_channel_logger_mt<>,
     (boost::log::keywords::severity = VerbosityWarning)(boost::log::keywords::channel = "warn"))
-#define cwarn LOG(dev::g_warnLogger::get())
+#define cwarn LOG_ALETH(dev::g_warnLogger::get())
 
 BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(
     g_noteLogger, boost::log::sources::severity_channel_logger_mt<>,
     (boost::log::keywords::severity = VerbosityInfo)(boost::log::keywords::channel = "info"))
-#define cnote LOG(dev::g_noteLogger::get())
+#define cnote LOG_ALETH(dev::g_noteLogger::get())
 
 BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(
     g_debugLogger, boost::log::sources::severity_channel_logger_mt<>,
     (boost::log::keywords::severity = VerbosityDebug)(boost::log::keywords::channel = "debug"))
-#define cdebug LOG(dev::g_debugLogger::get())
+#define cdebug LOG_ALETH(dev::g_debugLogger::get())
 
 BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(
     g_traceLogger, boost::log::sources::severity_channel_logger_mt<>,
     (boost::log::keywords::severity = VerbosityTrace)(boost::log::keywords::channel = "trace"))
-#define ctrace LOG(dev::g_traceLogger::get())
+#define ctrace LOG_ALETH(dev::g_traceLogger::get())
 
 // Simple macro to log to any channel a message without creating a logger object
 // e.g. clog(VerbosityInfo, "channel") << "message";
