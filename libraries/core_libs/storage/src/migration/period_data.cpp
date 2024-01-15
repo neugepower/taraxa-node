@@ -17,7 +17,8 @@ void PeriodData::migrate(logger::Logger& log) {
   auto copied_col = db_->copyColumn(db_->handle(orig_col), orig_col.name() + "-copy");
 
   if (copied_col == nullptr) {
-    LOG(log) << "Migration " << id() << " skipped: Unable to copy " << orig_col.name() << " column";
+    // TODO(chriz): re-enable all logging again
+    //LOG(log) << "Migration " << id() << " skipped: Unable to copy " << orig_col.name() << " column";
     return;
   }
 
@@ -60,7 +61,8 @@ void PeriodData::migrate(logger::Logger& log) {
     auto percentage = (i - start_period) * 100 / diff;
     if (percentage > curr_progress) {
       curr_progress = percentage;
-      LOG(log) << "Migration " << id() << " progress " << curr_progress << "%";
+      // TODO(chriz): re-enable all logging again
+      //LOG(log) << "Migration " << id() << " progress " << curr_progress << "%";
     }
   }
 

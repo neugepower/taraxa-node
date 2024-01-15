@@ -136,7 +136,8 @@ void NodeStats::logNodeStats(const std::vector<std::shared_ptr<network::tarcap::
   LOG(log_nf_) << "Connected to " << peers_size << " peers: [ " << connected_peers_str << "]";
   LOG(log_dg_) << "Connected peers: [ " << connected_peers_str_with_ip << "]";
   LOG(log_nf_) << "Number of discovered peers: " << number_of_discov_peers;
-  LOG(log_dg_) << "Discovered peers: " << nodes;
+  // TODO(chriz): re-enable all logging again
+  //LOG(log_dg_) << "Discovered peers: " << nodes;
 
   if (is_pbft_syncing) {
     // Syncing...

@@ -1544,7 +1544,8 @@ bool PbftManager::pushPbftBlock_(PeriodData &&period_data, std::vector<std::shar
 
   auto batch = db_->createWriteBatch();
 
-  LOG(log_dg_) << "Storing pbft blk " << pbft_block_hash << " cert votes: " << cert_votes;
+  // TODO(chriz): re-enable all logging again
+  LOG(log_dg_) << "Storing pbft blk " << pbft_block_hash << " cert votes: "; // << cert_votes;
   // Update PBFT chain head block
   db_->addPbftHeadToBatch(pbft_chain_->getHeadHash(), pbft_chain_->getJsonStrForBlock(pbft_block_hash, null_anchor),
                           batch);
