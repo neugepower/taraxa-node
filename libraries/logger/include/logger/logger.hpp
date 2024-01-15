@@ -2,11 +2,40 @@
 
 #include <boost/log/sources/severity_channel_logger.hpp>
 #include <string>
+#include <string_view>
+#include <ostream>
 
 #include "common/types.hpp"
 #include "logger/logger_config.hpp"
 
 namespace taraxa::logger {
+
+struct LoggerRust {
+  void* logger;
+  Verbosity verbosity;
+  const char* channel;
+};
+
+#ifdef __cplusplus
+extern "C" {
+
+LoggerRust createLoggerRust(Verbosity verbosity, const char* channel, addr_t node_id);
+
+void sink(LoggerRust logger, const char* msg);
+
+#endif
+#ifdef __cplusplus
+}
+#endif
+
+struct Sink {
+  LoggerRust logger;
+  std::ostringstream stream;
+  bool done = false;
+  ~Sink() {
+    sink(logger, stream.str().c_str());
+  }
+};
 
 // Concurrent (Thread-safe) logger type
 using Logger = boost::log::sources::severity_channel_logger_mt<>;
@@ -56,36 +85,40 @@ void InitLogging(Config& logging_config, const addr_t& node_id);
 
 }  // namespace taraxa::logger
 
-#define LOG BOOST_LOG
+#define LOG(_logger_)                                                          \
+  for (auto sink=taraxa::logger::Sink{ _logger_ }; !sink.done; sink.done=true) \
+    sink.stream
 
-#define LOG_OBJECTS_DEFINE                \
-  mutable taraxa::logger::Logger log_si_; \
-  mutable taraxa::logger::Logger log_er_; \
-  mutable taraxa::logger::Logger log_wr_; \
-  mutable taraxa::logger::Logger log_nf_; \
-  mutable taraxa::logger::Logger log_dg_; \
-  mutable taraxa::logger::Logger log_tr_;
+#define LOG_OBJECTS_DEFINE                    \
+  mutable taraxa::logger::LoggerRust log_si_; \
+  mutable taraxa::logger::LoggerRust log_er_; \
+  mutable taraxa::logger::LoggerRust log_wr_; \
+  mutable taraxa::logger::LoggerRust log_nf_; \
+  mutable taraxa::logger::LoggerRust log_dg_; \
+  mutable taraxa::logger::LoggerRust log_tr_;
 
-#define LOG_OBJECTS_DEFINE_SUB(group)               \
-  mutable taraxa::logger::Logger log_si_##group##_; \
-  mutable taraxa::logger::Logger log_er_##group##_; \
-  mutable taraxa::logger::Logger log_wr_##group##_; \
-  mutable taraxa::logger::Logger log_nf_##group##_; \
-  mutable taraxa::logger::Logger log_dg_##group##_; \
-  mutable taraxa::logger::Logger log_tr_##group##_;
+#define LOG_OBJECTS_DEFINE_SUB(group)                   \
+  mutable taraxa::logger::LoggerRust log_si_##group##_; \
+  mutable taraxa::logger::LoggerRust log_er_##group##_; \
+  mutable taraxa::logger::LoggerRust log_wr_##group##_; \
+  mutable taraxa::logger::LoggerRust log_nf_##group##_; \
+  mutable taraxa::logger::LoggerRust log_dg_##group##_; \
+  mutable taraxa::logger::LoggerRust log_tr_##group##_;
 
-#define LOG_OBJECTS_CREATE(channel)                                                               \
-  log_si_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Silent, channel, node_addr);  \
-  log_er_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Error, channel, node_addr);   \
-  log_wr_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Warning, channel, node_addr); \
-  log_nf_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Info, channel, node_addr);    \
-  log_tr_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Trace, channel, node_addr);   \
-  log_dg_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Debug, channel, node_addr);
+#define LOG_OBJECTS_CREATE(channel)                                                                              \
+  auto __channel__ = std::string_view{ channel };                                                                \
+  log_si_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Silent, __channel__.data(), node_addr);  \
+  log_er_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Error, __channel__.data(), node_addr);   \
+  log_wr_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Warning, __channel__.data(), node_addr); \
+  log_nf_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Info, __channel__.data(), node_addr);    \
+  log_tr_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Trace, __channel__.data(), node_addr);   \
+  log_dg_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Debug, __channel__.data(), node_addr);
 
-#define LOG_OBJECTS_CREATE_SUB(channel, group)                                                              \
-  log_si_##group##_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Silent, channel, node_addr);  \
-  log_er_##group##_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Error, channel, node_addr);   \
-  log_wr_##group##_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Warning, channel, node_addr); \
-  log_nf_##group##_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Info, channel, node_addr);    \
-  log_tr_##group##_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Trace, channel, node_addr);   \
-  log_dg_##group##_ = taraxa::logger::createLogger(taraxa::logger::Verbosity::Debug, channel, node_addr);
+#define LOG_OBJECTS_CREATE_SUB(channel, group)                                                                             \
+  auto __channel__ = std::string_view{ channel };                                                                          \
+  log_si_##group##_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Silent, __channel__.data(), node_addr);  \
+  log_er_##group##_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Error, __channel__.data(), node_addr);   \
+  log_wr_##group##_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Warning, __channel__.data(), node_addr); \
+  log_nf_##group##_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Info, __channel__.data(), node_addr);    \
+  log_tr_##group##_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Trace, __channel__.data(), node_addr);   \
+  log_dg_##group##_ = taraxa::logger::createLoggerRust(taraxa::logger::Verbosity::Debug, __channel__.data(), node_addr);

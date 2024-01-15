@@ -178,6 +178,9 @@ include(CMakeModules/git_info.cmake)
 
 include(dependencies)
 
+# Add Rust dependencies
+corrosion_import_crate(MANIFEST_PATH rust/logger-rust/Cargo.toml)
+
 # Add sub-directories cmakes
 add_subdirectory(submodules)
 add_subdirectory(libraries)
