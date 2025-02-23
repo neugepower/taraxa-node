@@ -237,6 +237,26 @@ class DagManager : public std::enable_shared_from_this<DagManager> {
    */
   void clearLightNodeHistory(uint64_t light_node_history);
 
+  /**
+   * @brief Retrieves received dag count and resets counter
+   *
+   * @return count
+   */
+  double getAndResetReceivedBlockCount() { return received_block_count_.exchange(0); }
+  double getAndResetVerifiedBlockCount() { return verified_block_count_.exchange(0); }
+  double getAndResetMissingTransactionsBlockCount() { return missing_transactions_block_count_.exchange(0); }
+  double getAndResetAheadBlockCount() { return ahead_block_count_.exchange(0); }
+  double getAndResetFailedVdfVerificationBlockCount() { return failed_vdf_verification_block_count_.exchange(0); }
+  double getAndResetFutureBlockCount() { return future_block_count_.exchange(0); }
+  double getAndResetNotEligibleBlockCount() { return not_eligible_block_count_.exchange(0); }
+  double getAndResetExpiredBlockCount() { return expired_block_count_.exchange(0); }
+  double getAndResetIncorrectTransactionsEstimationBlockCount() {
+    return incorrect_transactions_estimation_block_count_.exchange(0);
+  }
+  double getAndResetTooBigBlockCount() { return too_big_block_count_.exchange(0); }
+  double getAndResetFailedTipsVerificationBlockCount() { return failed_tips_verification_block_count_.exchange(0); }
+  double getAndResetMissingTipBlockCount() { return missing_tip_block_count_.exchange(0); }
+
  private:
   void recoverDag();
   void addToDag(blk_hash_t const &hash, blk_hash_t const &pivot, std::vector<blk_hash_t> const &tips, uint64_t level,
@@ -281,6 +301,19 @@ class DagManager : public std::enable_shared_from_this<DagManager> {
   std::shared_ptr<final_chain::FinalChain> final_chain_;
   const GenesisConfig kGenesis;
   const uint64_t kValidatorMaxVote;
+
+  std::atomic_uint64_t received_block_count_ = 0;
+  std::atomic_uint64_t verified_block_count_ = 0;
+  std::atomic_uint64_t missing_transactions_block_count_ = 0;
+  std::atomic_uint64_t ahead_block_count_ = 0;
+  std::atomic_uint64_t failed_vdf_verification_block_count_ = 0;
+  std::atomic_uint64_t future_block_count_ = 0;
+  std::atomic_uint64_t not_eligible_block_count_ = 0;
+  std::atomic_uint64_t expired_block_count_ = 0;
+  std::atomic_uint64_t incorrect_transactions_estimation_block_count_ = 0;
+  std::atomic_uint64_t too_big_block_count_ = 0;
+  std::atomic_uint64_t failed_tips_verification_block_count_ = 0;
+  std::atomic_uint64_t missing_tip_block_count_ = 0;
 
   LOG_OBJECTS_DEFINE
 };

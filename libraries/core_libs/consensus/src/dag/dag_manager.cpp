@@ -605,6 +605,7 @@ std::pair<size_t, size_t> DagManager::getNonFinalizedBlocksSize() const {
 
 std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::verifyBlock(
     const std::shared_ptr<DagBlock> &blk, const std::unordered_map<trx_hash_t, std::shared_ptr<Transaction>> &trxs) {
+  ++received_block_count_;
   const auto &block_hash = blk->getHash();
   vec_trx_t const &all_block_trx_hashes = blk->getTrxs();
   vec_trx_t trx_hashes_to_query;
@@ -616,12 +617,14 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
   unique_tips_pivot.insert(blk->getPivot());
   if (blk->getTips().size() > kDagBlockMaxTips) {
     LOG(log_er_) << "DAG Block " << block_hash << " tips count " << blk->getTips().size() << " over the limit";
+    ++failed_tips_verification_block_count_;
     return {VerifyBlockReturnType::FailedTipsVerification, {}};
   }
 
   for (auto const &tip : blk->getTips()) {
     if (!unique_tips_pivot.insert(tip).second) {
       LOG(log_er_) << "DAG Block " << block_hash << " tip " << tip << " duplicate";
+      ++failed_tips_verification_block_count_;
       return {VerifyBlockReturnType::FailedTipsVerification, {}};
     }
   }
@@ -633,6 +636,7 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
     // Cannot find the proposal period in DB yet. The slow node gets an ahead block, remove from seen_blocks
     LOG(log_nf_) << "Cannot find proposal period in DB for DAG block " << blk->getHash();
     seen_blocks_.erase(block_hash);
+    ++ahead_block_count_;
     return {VerifyBlockReturnType::AheadBlock, {}};
   }
 
@@ -656,6 +660,7 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
     LOG(log_nf_) << "Ignore block " << block_hash << " since it has missing transactions";
     // This can be a valid block so just remove it from the seen list
     seen_blocks_.erase(block_hash);
+    ++missing_transactions_block_count_;
     return {VerifyBlockReturnType::MissingTransaction, {}};
   }
 
@@ -666,6 +671,7 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
   if (blk->getLevel() < dag_expiry_level_) {
     LOG(log_nf_) << "Dropping old block: " << blk->getHash() << ". Expiry level: " << dag_expiry_level_
                  << ". Block level: " << blk->getLevel();
+    ++expired_block_count_;
     return {VerifyBlockReturnType::ExpiredBlock, {}};
   }
 
@@ -674,6 +680,7 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
   if (!pk) {
     LOG(log_er_) << "DAG block " << blk->getHash() << " with " << blk->getLevel()
                  << " level is missing VRF key for sender " << blk->getSender();
+    ++failed_vdf_verification_block_count_;
     return {VerifyBlockReturnType::FailedVdfVerification, {}};
   }
 
@@ -692,6 +699,7 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
     LOG(log_er_) << "DAG block " << block_hash << " with " << blk->getLevel()
                  << " level failed on VDF verification with pivot hash " << blk->getPivot() << " reason " << e.what();
     LOG(log_er_) << "period from map: " << *propose_period << " current: " << pbft_chain_->getPbftChainSize();
+    ++failed_vdf_verification_block_count_;
     return {VerifyBlockReturnType::FailedVdfVerification, {}};
   }
 
@@ -701,12 +709,14 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
     dpos_qualified = final_chain_->dposIsEligible(*propose_period, dag_block_sender);
   } catch (state_api::ErrFutureBlock &c) {
     LOG(log_er_) << "Verify proposal period " << *propose_period << " is too far ahead of DPOS. " << c.what();
+    ++future_block_count_;
     return {VerifyBlockReturnType::FutureBlock, {}};
   }
   if (!dpos_qualified) {
     LOG(log_er_) << "Invalid DAG block DPOS. DAG block " << blk << " is not eligible for DPOS at period "
                  << *propose_period << " for sender " << dag_block_sender.toString() << " current period "
                  << final_chain_->lastBlockNumber();
+    ++not_eligible_block_count_;
     return {VerifyBlockReturnType::NotEligible, {}};
   }
   {
@@ -720,6 +730,7 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
       LOG(log_er_) << "Invalid block_gas_estimation. DAG block " << blk->getHash()
                    << " block_gas_estimation: " << block_gas_estimation << " total_block_weight " << total_block_weight
                    << " current period " << final_chain_->lastBlockNumber();
+      ++incorrect_transactions_estimation_block_count_;
       return {VerifyBlockReturnType::IncorrectTransactionsEstimation, {}};
     }
 
@@ -729,6 +740,7 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
       LOG(log_er_) << "BlockTooBig. DAG block " << blk->getHash() << " gas_limit: " << dag_gas_limit
                    << " total_block_weight " << total_block_weight << " current period "
                    << final_chain_->lastBlockNumber();
+      ++too_big_block_count_;
       return {VerifyBlockReturnType::BlockTooBig, {}};
     }
 
@@ -737,6 +749,7 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
         const auto tip_blk = getDagBlock(t);
         if (tip_blk == nullptr) {
           LOG(log_er_) << "DAG Block " << block_hash << " tip " << t << " not present";
+          ++missing_tip_block_count_;
           return {VerifyBlockReturnType::MissingTip, {}};
         }
         block_gas_estimation += tip_blk->getGasEstimation();
@@ -745,6 +758,7 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
         LOG(log_er_) << "BlockTooBig. DAG block " << blk->getHash() << " with tips has limit: " << pbft_gas_limit
                      << " block_gas_estimation " << block_gas_estimation << " current period "
                      << final_chain_->lastBlockNumber();
+        ++too_big_block_count_;
         return {VerifyBlockReturnType::BlockTooBig, {}};
       }
     }
@@ -752,6 +766,7 @@ std::pair<DagManager::VerifyBlockReturnType, SharedTransactions> DagManager::ver
 
   LOG(log_dg_) << "Verified DAG block " << blk->getHash();
 
+  ++verified_block_count_;
   return {VerifyBlockReturnType::Verified, std::move(all_block_trxs)};
 }
 

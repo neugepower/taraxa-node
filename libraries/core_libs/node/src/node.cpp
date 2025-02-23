@@ -14,6 +14,7 @@
 #include "graphql/http_processor.hpp"
 #include "graphql/ws_server.hpp"
 #include "key_manager/key_manager.hpp"
+#include "metrics/dag_metrics.hpp"
 #include "metrics/metrics_service.hpp"
 #include "metrics/network_metrics.hpp"
 #include "metrics/pbft_metrics.hpp"
@@ -164,6 +165,26 @@ void FullNode::setupMetricsUpdaters() {
     pbft_metrics->setBlockTransactionsCount(res->trxs.size());
     pbft_metrics->setBlockTimestamp(res->final_chain_blk->timestamp);
   });
+
+  auto dag_metrics = metrics_->getMetrics<metrics::DagMetrics>();
+  dag_metrics->incrementReceivedUpdater([dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetReceivedBlockCount(); });
+  dag_metrics->incrementVerifiedUpdater([dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetVerifiedBlockCount(); });
+  dag_metrics->incrementMissingTransactionsUpdater(
+      [dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetMissingTransactionsBlockCount(); });
+  dag_metrics->incrementAheadUpdater([dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetAheadBlockCount(); });
+  dag_metrics->incrementFailedVdfVerificationUpdater(
+      [dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetFailedVdfVerificationBlockCount(); });
+  dag_metrics->incrementFutureUpdater([dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetFutureBlockCount(); });
+  dag_metrics->incrementNotEligibleUpdater(
+      [dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetNotEligibleBlockCount(); });
+  dag_metrics->incrementExpiredUpdater([dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetExpiredBlockCount(); });
+  dag_metrics->incrementIncorrectTransactionsEstimationUpdater(
+      [dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetIncorrectTransactionsEstimationBlockCount(); });
+  dag_metrics->incrementTooBigUpdater([dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetTooBigBlockCount(); });
+  dag_metrics->incrementFailedTipsVerificationUpdater(
+      [dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetFailedTipsVerificationBlockCount(); });
+  dag_metrics->incrementMissingTipUpdater(
+      [dag_mgr = dag_mgr_]() { return dag_mgr->getAndResetMissingTipBlockCount(); });
 }
 
 void FullNode::start() {

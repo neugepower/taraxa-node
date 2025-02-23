@@ -1,5 +1,6 @@
 #pragma once
 
+#include <prometheus/counter.h>
 #include <prometheus/gauge.h>
 #include <prometheus/registry.h>
 
@@ -17,6 +18,15 @@ namespace taraxa::metrics {
   }
 
 /**
+ * @brief add method that is setting specific counter metric.
+ */
+#define ADD_COUNTER_METRIC(method, name, description)                                                  \
+  void method(double v) {                                                                              \
+    static auto& label = addMetric<prometheus::Counter>(group_name + "_" + name, description).Add({}); \
+    label.Increment(v);                                                                                \
+  }
+
+/**
  * @brief add updater method.
  * This is used to store lambda function that updates metric, so we can update it periodically
  * Passed `method` should be added first
@@ -31,6 +41,13 @@ namespace taraxa::metrics {
  */
 #define ADD_GAUGE_METRIC_WITH_UPDATER(method, name, description) \
   ADD_GAUGE_METRIC(method, name, description)                    \
+  ADD_UPDATER_METHOD(method)
+
+/**
+ * @brief combines ADD_UPDATER_METHOD and ADD_COUNTER_METRIC
+ */
+#define ADD_COUNTER_METRIC_WITH_UPDATER(method, name, description) \
+  ADD_COUNTER_METRIC(method, name, description)                    \
   ADD_UPDATER_METHOD(method)
 
 class MetricsGroup {

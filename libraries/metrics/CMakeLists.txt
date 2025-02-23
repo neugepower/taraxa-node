@@ -1,4 +1,5 @@
 set(HEADERS
+    include/metrics/dag_metrics.hpp
     include/metrics/metrics_group.hpp
     include/metrics/metrics_service.hpp
     include/metrics/network_metrics.hpp
