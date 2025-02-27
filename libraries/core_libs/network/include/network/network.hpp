@@ -131,6 +131,8 @@ class Network {
   // Threadpool for periodic and delayed events
   util::ThreadPool periodic_events_tp_;
 
+  double getAndResetReceivedPackagesCount() { return packets_tp_->getAndResetReceivedPackagesCount(); }
+
   LOG_OBJECTS_DEFINE
 };
 

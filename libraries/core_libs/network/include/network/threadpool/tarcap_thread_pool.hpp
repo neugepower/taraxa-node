@@ -69,6 +69,8 @@ class PacketsThreadPool {
    */
   std::tuple<size_t, size_t, size_t> getQueueSize() const;
 
+  double getAndResetReceivedPackagesCount() { return received_packages_count_.exchange(0); }
+
  private:
   // Declare logger instances
   LOG_OBJECTS_DEFINE
@@ -96,6 +98,8 @@ class PacketsThreadPool {
 
   // Vector of worker threads - should be initialized as the last member
   std::vector<std::thread> workers_;
+
+  std::atomic_uint64_t received_packages_count_ = 0;
 };
 
 }  // namespace taraxa::network::threadpool

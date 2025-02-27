@@ -32,6 +32,8 @@ PacketsThreadPool::~PacketsThreadPool() {
  * @return packet unique ID. In case push was not successful, empty optional is returned
  **/
 std::optional<uint64_t> PacketsThreadPool::push(std::pair<tarcap::TarcapVersion, PacketData>&& packet_data) {
+  ++received_packages_count_;
+
   if (stopProcessing_) {
     LOG(log_wr_) << "Trying to push packet while tp processing is stopped";
     return {};
