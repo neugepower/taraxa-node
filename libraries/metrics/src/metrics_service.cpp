@@ -1,35 +1,51 @@
 #include "metrics/metrics_service.hpp"
 
-#include <prometheus/counter.h>
+//#include <prometheus/counter.h>
 
 #include <iostream>
 #include <memory>
 #include <thread>
 
 namespace taraxa::metrics {
-MetricsService::MetricsService(const std::string& host, uint16_t port, uint16_t polling_interval_ms)
-    : kPollingIntervalMs(polling_interval_ms) {
-  exposer_ = std::make_unique<prometheus::Exposer>(host + ":" + std::to_string(port));
-  registry_ = std::make_shared<prometheus::Registry>();
-  exposer_->RegisterCollectable(registry_);
+namespace {
+  std::function<int64_t()> callback_;
+
+  int64_t getValue() {
+    return callback_();
+  }
 }
 
+
+typedef int64_t (*Callback)();
+
+#ifdef __cplusplus
+extern "C" {
+start_metric_service();
+stop_metric_service();
+
+void register_network_peers_counter_callback(Callback callback);
+void register_network_discovered_peers_counter_callback(Callback callback);
+#endif
+#ifdef __cplusplus
+}
+#endif
+
+
+void setNetworkPeersCounterCallback(std::function<int64_t()> const& callback) {
+  callback_ = callback;
+  register_network_peers_counter_callback(&getValue);
+}
+
+// ---
+
 MetricsService::~MetricsService() {
-  if (thread_) {
-    thread_->join();
-  }
+  // stop_metric_service()
 }
+
 void MetricsService::start() {
-  if (!exposer_) {
-    return;
-  }
-  thread_ = std::make_unique<std::thread>([&]() {
-    for (;;) {
-      for (auto& r : metrics_) {
-        r.second->updateData();
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds(kPollingIntervalMs));
-    }
-  });
+  create_metric_service();
 }
+
+
+
 }  // namespace taraxa::metrics

@@ -180,6 +180,7 @@ include(dependencies)
 
 # Add Rust dependencies
 corrosion_import_crate(MANIFEST_PATH rust/logger-rust/Cargo.toml)
+corrosion_import_crate(MANIFEST_PATH rust/metrics-rust/Cargo.toml)
 
 # Add sub-directories cmakes
 add_subdirectory(submodules)
@@ -189,6 +190,8 @@ add_subdirectory(tests)
 
 # An extension of this file that you can play with locally
 include(local/CMakeLists_ext.cmake OPTIONAL)
+
+#corrosion_link_libraries(metrics-rust metrics)
 
 # dependency graph
 # add_custom_target(graphviz ALL
