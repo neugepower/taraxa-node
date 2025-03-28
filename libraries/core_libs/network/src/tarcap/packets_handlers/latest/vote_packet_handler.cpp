@@ -11,12 +11,13 @@ VotePacketHandler::VotePacketHandler(const FullNodeConfig &conf, std::shared_ptr
                                      std::shared_ptr<PbftManager> pbft_mgr, std::shared_ptr<PbftChain> pbft_chain,
                                      std::shared_ptr<VoteManager> vote_mgr,
                                      std::shared_ptr<SlashingManager> slashing_manager, const addr_t &node_addr,
-                                     const std::string &logs_prefix)
+                                     PrometheusPacketStats &prometheus_packet_stats, const std::string &logs_prefix)
     : ExtVotesPacketHandler(conf, std::move(peers_state), std::move(packets_stats), std::move(pbft_mgr),
                             std::move(pbft_chain), std::move(vote_mgr), std::move(slashing_manager), node_addr,
-                            logs_prefix + "PBFT_VOTE_PH") {}
+                            prometheus_packet_stats, logs_prefix + "PBFT_VOTE_PH") {}
 
 void VotePacketHandler::process(VotePacket &&packet, const std::shared_ptr<TaraxaPeer> &peer) {
+  ++prometheus_packet_stats_.received_vote;
   const auto [current_pbft_round, current_pbft_period] = pbft_mgr_->getPbftRoundAndPeriod();
 
   if (packet.optional_data.has_value()) {

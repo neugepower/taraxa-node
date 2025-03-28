@@ -150,6 +150,182 @@ void FullNode::setupMetricsUpdaters() {
   network_metrics->setDiscoveredPeersCountUpdater([network = network_]() { return network->getNodeCount(); });
   network_metrics->setSyncingDurationUpdater([network = network_]() { return network->syncTimeSeconds(); });
 
+  // packets
+  network_metrics->incrementReceivedPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received.exchange(0); });
+  network_metrics->incrementReceivedFilteredPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_thread_pool.exchange(0); });
+  network_metrics->incrementDroppedTooEarlyPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_too_early.exchange(0); });
+  network_metrics->incrementDroppedSyncingPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_syncing.exchange(0); });
+  network_metrics->incrementDroppedPeersProcessingTimeTooHighPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_peers_processing_time_too_high.exchange(0);
+  });
+  network_metrics->incrementDroppedWrongTarcapVersionPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_wrong_tarcap_version.exchange(0); });
+  network_metrics->incrementDroppedPeerLostPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_peer_lost.exchange(0); });
+  network_metrics->incrementDroppedMaliciousPeerPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_malicious_peer.exchange(0); });
+  network_metrics->incrementDroppedBadPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_packet_bad.exchange(0); });
+  network_metrics->incrementDroppedRlpBadPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_rlp_bad.exchange(0); });
+  network_metrics->incrementDroppedUnknownErrorPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_unknown_error.exchange(0); });
+
+  // pillar vote
+  network_metrics->incrementReceviedPillarVotePacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_pillar_vote.exchange(0); });
+  network_metrics->incrementProcessedPillarVotePacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().processed_pillar_vote.exchange(0); });
+  network_metrics->incrementSendPillarVotePacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().send_pillar_vote.exchange(0); });
+  network_metrics->incrementDroppedPillarIrrelevantVotePacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_pillar_irrelevant_vote.exchange(0);
+  });
+  network_metrics->incrementDroppedPillarInvalidVotePacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_pillar_invalid_vote.exchange(0); });
+  network_metrics->incrementDroppedPillarOldPeriodVotePacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_pillar_old_period_vote.exchange(0);
+  });
+  network_metrics->incrementReceivedPillarBundleVotePacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_pillar_bundle_vote.exchange(0); });
+  network_metrics->incrementDroppedPillarBundleOldPeriodVotePacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_pillar_bundle_old_period_vote.exchange(0);
+  });
+  network_metrics->incrementDroppedPillarBundleTooLargeVotePacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_pillar_bundle_too_large_vote.exchange(0);
+  });
+  network_metrics->incrementReceivedGetPillarBundleVoteCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().received_get_pillar_bundle_vote.exchange(0);
+  });
+  network_metrics->incrementDroppedGetPillarBundleOldPeriodVotePacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_get_pillar_bundle_old_period_vote.exchange(0);
+  });
+  network_metrics->incrementDroppedGetPillarBundleWrongPeriodVotePacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_get_pillar_bundle_wrong_period_vote.exchange(0);
+  });
+  network_metrics->incrementDroppedGetPillarBundleEmptyVotePacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_get_pillar_bundle_empty_vote.exchange(0);
+  });
+  network_metrics->incrementSendPillarBundleVotePacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().send_pillar_bundle_vote.exchange(0); });
+  network_metrics->incrementRequestPillarBundleVotePacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().request_pillar_bundle_vote.exchange(0); });
+
+  // dag
+  network_metrics->incrementReceivedDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_dag.exchange(0); });
+  network_metrics->incrementDroppedKnownDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_known_dag.exchange(0); });
+  network_metrics->incrementSendDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().send_dag.exchange(0); });
+  network_metrics->incrementFailedSendDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().failed_send_dag.exchange(0); });
+  network_metrics->incrementVerifiedDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().verified_dag.exchange(0); });
+  network_metrics->incrementDroppedMissingTransactionsDagPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_missing_transactions_dag.exchange(0);
+  });
+  network_metrics->incrementDroppedAheadDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_ahead_dag.exchange(0); });
+  network_metrics->incrementDroppedFailedVdfVerificationDagPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_failed_vdf_verification_dag.exchange(0);
+  });
+  network_metrics->incrementDroppedFutureDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_future_dag.exchange(0); });
+  network_metrics->incrementDroppedNotEligibleDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_not_eligible_dag.exchange(0); });
+  network_metrics->incrementDroppedExpiredDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_expired_dag.exchange(0); });
+  network_metrics->incrementDroppedIncorrectTransactionsEstimationDagPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_incorrect_transactions_estimation_dag.exchange(0);
+  });
+  network_metrics->incrementDroppedTooBigDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_too_big_dag.exchange(0); });
+  network_metrics->incrementDroppedFailedTipsVerificationDagPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_failed_tips_verification_dag.exchange(0);
+  });
+  network_metrics->incrementDroppedMissingTipDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_missing_tip_dag.exchange(0); });
+
+  network_metrics->incrementRequestDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().request_dag.exchange(0); });
+  network_metrics->incrementRequestSendDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().request_send_dag.exchange(0); });
+  network_metrics->incrementRequestFailedNoPeerMatchDagPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().request_failed_no_peer_match_dag.exchange(0);
+  });
+  network_metrics->incrementRequestFailedNoPeersDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().request_failed_no_peers_dag.exchange(0); });
+  network_metrics->incrementRequestFailedAlreadyRequestedFromPeerDagPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().request_failed_already_requested_from_peer_dag.exchange(0);
+  });
+  network_metrics->incrementRequestFailedUnmatchedPeriodDagPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().request_failed_unmatched_period_dag.exchange(0);
+  });
+
+  // sync dag
+  network_metrics->incrementDroppedSendSyncDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_send_sync_dag.exchange(0); });
+  network_metrics->incrementDroppedSendNoPeerDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_send_no_peers_dag.exchange(0); });
+  network_metrics->incrementReceivedSyncDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_sync_dag.exchange(0); });
+  network_metrics->incrementVerifiedSyncDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().verified_sync_dag.exchange(0); });
+  network_metrics->incrementDroppedPastPeriodSyncDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_past_period_sync_dag.exchange(0); });
+  network_metrics->incrementDroppedFuturePeriodSyncDagPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_future_period_sync_dag.exchange(0);
+  });
+  network_metrics->incrementDroppedTxInvalidSyncDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_tx_invalid_sync_dag.exchange(0); });
+  network_metrics->incrementDroppedInvalidVerifySyncDagPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_invalid_verify_sync_dag.exchange(0);
+  });
+  network_metrics->incrementDroppedInvalidSyncDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().dropped_invalid_sync_dag.exchange(0); });
+  network_metrics->incrementReceivedGetSyncDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_get_sync_dag.exchange(0); });
+  network_metrics->incrementDroppedNotAllowedGetSyncDagPacketsCountUpdater([network = network_]() {
+    return network->getPrometheusPacketStats().dropped_not_allowed_get_sync_dag.exchange(0);
+  });
+  network_metrics->incrementSendGetSyncDagPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().send_get_sync_dag.exchange(0); });
+
+  // votes
+  network_metrics->incrementReceivedVotePacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_vote.exchange(0); });
+  network_metrics->incrementReceivedVotesBundlePacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_votes_bundle.exchange(0); });
+  network_metrics->incrementReceivedGetNextVotesPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_get_next_votes.exchange(0); });
+
+  // pbft
+  network_metrics->incrementReceivedPbftSyncPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_pbft_sync.exchange(0); });
+  network_metrics->incrementReceivedGetPbftSyncPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_get_pbft_sync.exchange(0); });
+
+  // status
+  network_metrics->incrementReceivedStatusPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_status.exchange(0); });
+
+  // tx
+  network_metrics->incrementReceivedTxPacketsCountUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().received_tx.exchange(0); });
+
+  // queue sizes
+  network_metrics->setPacketQueueLowSizeUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().queue_size_low.load(); });
+  network_metrics->setPacketQueueMidSizeUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().queue_size_mid.load(); });
+  network_metrics->setPacketQueueHighSizeUpdater(
+      [network = network_]() { return network->getPrometheusPacketStats().queue_size_high.load(); });
+
   auto transaction_queue_metrics = metrics_->getMetrics<metrics::TransactionQueueMetrics>();
   transaction_queue_metrics->setTransactionsCountUpdater(
       [trx_mgr = trx_mgr_]() { return trx_mgr->getTransactionPoolSize(); });

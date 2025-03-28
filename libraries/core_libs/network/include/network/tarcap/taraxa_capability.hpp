@@ -37,6 +37,7 @@ namespace taraxa::network::tarcap {
 class PacketsHandler;
 class PbftSyncingState;
 class TaraxaPeer;
+struct PrometheusPacketStats;
 
 class TaraxaCapability final : public dev::p2p::CapabilityFace {
  public:
@@ -52,7 +53,7 @@ class TaraxaCapability final : public dev::p2p::CapabilityFace {
       const std::shared_ptr<VoteManager> &vote_mgr, const std::shared_ptr<DagManager> &dag_mgr,
       const std::shared_ptr<TransactionManager> &trx_mgr, const std::shared_ptr<SlashingManager> &slashing_manager,
       const std::shared_ptr<pillar_chain::PillarChainManager> &pillar_chain_mgr, TarcapVersion version,
-      const addr_t &node_addr)>;
+      const addr_t &node_addr, PrometheusPacketStats &prometheus_packet_stats)>;
 
   /**
    * @brief Default InitPacketsHandlers function definition with the latest version of packets handlers
@@ -72,6 +73,7 @@ class TaraxaCapability final : public dev::p2p::CapabilityFace {
                    std::shared_ptr<VoteManager> vote_mgr, std::shared_ptr<DagManager> dag_mgr,
                    std::shared_ptr<TransactionManager> trx_mgr, std::shared_ptr<SlashingManager> slashing_manager,
                    std::shared_ptr<pillar_chain::PillarChainManager> pillar_chain_mgr,
+                   PrometheusPacketStats &prometheus_packet_stats,
                    InitPacketsHandlers init_packets_handlers = kInitLatestVersionHandlers);
 
   virtual ~TaraxaCapability() = default;
@@ -126,6 +128,8 @@ class TaraxaCapability final : public dev::p2p::CapabilityFace {
   bool queue_over_limit_ = false;
   uint32_t last_disconnect_number_of_peers_ = 0;
 
+  PrometheusPacketStats &prometheus_packet_stats_;
+
   LOG_OBJECTS_DEFINE
 };
 
@@ -133,5 +137,4 @@ template <typename PacketHandlerType>
 std::shared_ptr<PacketHandlerType> TaraxaCapability::getSpecificHandler() const {
   return packets_handlers_->getSpecificHandler<PacketHandlerType>();
 }
-
 }  // namespace taraxa::network::tarcap

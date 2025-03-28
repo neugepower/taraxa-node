@@ -11,7 +11,8 @@
 
 namespace taraxa::network::tarcap {
 class PacketsHandler;
-}
+struct PrometheusPacketStats;
+}  // namespace taraxa::network::tarcap
 
 namespace taraxa::network::threadpool {
 
@@ -23,7 +24,8 @@ class PacketsThreadPool {
   /**
    * @param workers_num  Number of workers
    **/
-  PacketsThreadPool(size_t workers_num = 10, const addr_t& node_addr = {});
+  PacketsThreadPool(tarcap::PrometheusPacketStats& prometheus_packet_stats, size_t workers_num = 10,
+                    const addr_t& node_addr = {});
   ~PacketsThreadPool();
 
   PacketsThreadPool(const PacketsThreadPool&) = delete;
@@ -72,6 +74,8 @@ class PacketsThreadPool {
  private:
   // Declare logger instances
   LOG_OBJECTS_DEFINE
+
+  tarcap::PrometheusPacketStats& prometheus_packet_stats_;
 
   // Number of workers(threads)
   const size_t workers_num_;

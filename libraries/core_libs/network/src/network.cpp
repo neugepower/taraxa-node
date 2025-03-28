@@ -43,8 +43,8 @@ Network::Network(const FullNodeConfig &config, const h256 &genesis_hash, std::fi
       node_stats_(nullptr),
       pbft_syncing_state_(std::make_shared<network::tarcap::PbftSyncingState>(config.network.deep_syncing_threshold)),
       tp_(config.network.num_threads, false),
-      packets_tp_(std::make_shared<network::threadpool::PacketsThreadPool>(config.network.packets_processing_threads,
-                                                                           key.address())),
+      packets_tp_(std::make_shared<network::threadpool::PacketsThreadPool>(
+          prometheus_packet_stats_, config.network.packets_processing_threads, key.address())),
       periodic_events_tp_(kPeriodicEventsThreadCount, false) {
   auto const &node_addr = key.address();
   LOG_OBJECTS_CREATE("NETWORK");
@@ -87,7 +87,7 @@ Network::Network(const FullNodeConfig &config, const h256 &genesis_hash, std::fi
     // Register latest version of taraxa capability
     auto latest_tarcap = std::make_shared<network::tarcap::TaraxaCapability>(
         TARAXA_NET_VERSION, config, genesis_hash, host, key, packets_tp_, all_packets_stats_, pbft_syncing_state_, db,
-        pbft_mgr, pbft_chain, vote_mgr, dag_mgr, trx_mgr, slashing_manager, pillar_chain_mgr);
+        pbft_mgr, pbft_chain, vote_mgr, dag_mgr, trx_mgr, slashing_manager, pillar_chain_mgr, prometheus_packet_stats_);
     capabilities.emplace_back(latest_tarcap);
 
     return capabilities;
@@ -350,6 +350,7 @@ void Network::gossipPillarBlockVote(const std::shared_ptr<PillarVote> &vote, boo
 }
 
 void Network::handleMaliciousSyncPeer(const dev::p2p::NodeID &node_id) {
+  LOG(log_er_) << "Mark peer malicious: " << node_id << std::endl;
   for (const auto &tarcap : tarcaps_) {
     // Peer is present only in one taraxa capability depending on his network version
     if (auto peer = tarcap.second->getPeersState()->getPeer(node_id); !peer) {

@@ -10,6 +10,7 @@ class PbftSyncPacketHandler : public ExtSyncingPacketHandler {
                         std::shared_ptr<PbftSyncingState> pbft_syncing_state, std::shared_ptr<PbftChain> pbft_chain,
                         std::shared_ptr<PbftManager> pbft_mgr, std::shared_ptr<DagManager> dag_mgr,
                         std::shared_ptr<VoteManager> vote_mgr, std::shared_ptr<DbStorage> db, const addr_t& node_addr,
+                        PrometheusPacketStats& prometheus_packet_stats,
                         const std::string& logs_prefix = "PBFT_SYNC_PH");
   void handleMaliciousSyncPeer(const dev::p2p::NodeID& id);
   // Packet type that is processed by this handler

@@ -11,7 +11,7 @@ class VotePacketHandler : public ExtVotesPacketHandler<VotePacket> {
                     std::shared_ptr<TimePeriodPacketsStats> packets_stats, std::shared_ptr<PbftManager> pbft_mgr,
                     std::shared_ptr<PbftChain> pbft_chain, std::shared_ptr<VoteManager> vote_mgr,
                     std::shared_ptr<SlashingManager> slashing_manager, const addr_t& node_addr,
-                    const std::string& logs_prefix = "");
+                    PrometheusPacketStats& prometheus_packet_stats, const std::string& logs_prefix = "");
 
   /**
    * @brief Sends pbft vote to connected peers

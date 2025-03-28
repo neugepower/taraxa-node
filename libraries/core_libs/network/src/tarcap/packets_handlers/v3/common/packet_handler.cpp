@@ -7,8 +7,11 @@ namespace taraxa::network::tarcap::v3 {
 
 PacketHandler::PacketHandler(const FullNodeConfig& conf, std::shared_ptr<PeersState> peers_state,
                              std::shared_ptr<TimePeriodPacketsStats> packets_stats, const addr_t& node_addr,
-                             const std::string& log_channel_name)
-    : kConf(conf), peers_state_(std::move(peers_state)), packets_stats_(std::move(packets_stats)) {
+                             PrometheusPacketStats& prometheus_packet_stats, const std::string& log_channel_name)
+    : kConf(conf),
+      peers_state_(std::move(peers_state)),
+      packets_stats_(std::move(packets_stats)),
+      prometheus_packet_stats_(prometheus_packet_stats) {
   LOG_OBJECTS_CREATE(log_channel_name);
 }
 

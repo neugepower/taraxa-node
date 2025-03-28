@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "logger/logger.hpp"
+#include "network/tarcap/prometheus_packet_stats.hpp"
 #include "network/tarcap/tarcap_version.hpp"
 #include "network/threadpool/packets_blocking_mask.hpp"
 #include "packets_queue.hpp"
@@ -14,7 +15,8 @@ namespace taraxa::network::threadpool {
 
 class PriorityQueue {
  public:
-  PriorityQueue(size_t tp_workers_count, const addr_t& node_addr = {});
+  PriorityQueue(size_t tp_workers_count, tarcap::PrometheusPacketStats& prometheus_packet_stats,
+                const addr_t& node_addr = {});
 
   /**
    * @brief Pushes new packet into the priority queue
@@ -98,6 +100,8 @@ class PriorityQueue {
 
   // How many workers are currently processing packets from all the queues at the same time
   std::atomic<size_t> act_total_workers_count_;
+
+  tarcap::PrometheusPacketStats& prometheus_packet_stats_;
 };
 
 }  // namespace taraxa::network::threadpool

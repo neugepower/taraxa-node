@@ -13,6 +13,10 @@
 #include "network/tarcap/taraxa_peer.hpp"
 #include "network/threadpool/packet_data.hpp"
 
+namespace taraxa::network::tarcap {
+struct PrometheusPacketStats;
+}
+
 namespace taraxa::network::tarcap::v3 {
 
 // class TimePeriodPacketsStats;
@@ -24,7 +28,7 @@ class PacketHandler : public BasePacketHandler {
  public:
   PacketHandler(const FullNodeConfig& conf, std::shared_ptr<PeersState> peers_state,
                 std::shared_ptr<TimePeriodPacketsStats> packets_stats, const addr_t& node_addr,
-                const std::string& log_channel_name);
+                PrometheusPacketStats& prometheus_packet_stats, const std::string& log_channel_name);
   virtual ~PacketHandler() = default;
   PacketHandler(const PacketHandler&) = default;
   PacketHandler(PacketHandler&&) = default;
@@ -78,6 +82,8 @@ class PacketHandler : public BasePacketHandler {
 
   // Shared packet stats
   std::shared_ptr<TimePeriodPacketsStats> packets_stats_;
+
+  PrometheusPacketStats& prometheus_packet_stats_;
 
   // Declare logger instances
   LOG_OBJECTS_DEFINE

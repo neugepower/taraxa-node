@@ -13,13 +13,15 @@ DagBlockPacketHandler::DagBlockPacketHandler(const FullNodeConfig &conf, std::sh
                                              std::shared_ptr<PbftChain> pbft_chain,
                                              std::shared_ptr<PbftManager> pbft_mgr, std::shared_ptr<DagManager> dag_mgr,
                                              std::shared_ptr<TransactionManager> trx_mgr, std::shared_ptr<DbStorage> db,
-                                             const addr_t &node_addr, const std::string &logs_prefix)
+                                             const addr_t &node_addr, PrometheusPacketStats &prometheus_packet_stats,
+                                             const std::string &logs_prefix)
     : ExtSyncingPacketHandler(conf, std::move(peers_state), std::move(packets_stats), std::move(pbft_syncing_state),
                               std::move(pbft_chain), std::move(pbft_mgr), std::move(dag_mgr), std::move(db), node_addr,
-                              logs_prefix + "DAG_BLOCK_PH"),
+                              prometheus_packet_stats, logs_prefix + "DAG_BLOCK_PH"),
       trx_mgr_(std::move(trx_mgr)) {}
 
 void DagBlockPacketHandler::process(DagBlockPacket &&packet, const std::shared_ptr<TaraxaPeer> &peer) {
+  ++prometheus_packet_stats_.received_dag;
   blk_hash_t const hash = packet.dag_block->getHash();
 
   for (const auto &tx : packet.transactions) {
@@ -33,6 +35,7 @@ void DagBlockPacketHandler::process(DagBlockPacket &&packet, const std::shared_p
 
   // Do not process this block in case we already have it
   if (dag_mgr_->isDagBlockKnown(packet.dag_block->getHash())) {
+    ++prometheus_packet_stats_.dropped_known_dag;
     LOG(log_tr_) << "Received known DagBlockPacket " << hash << "from: " << peer->getId();
     return;
   }
@@ -54,9 +57,12 @@ void DagBlockPacketHandler::sendBlockWithTransactions(const std::shared_ptr<Tara
 
   DagBlockPacket dag_block_packet{.transactions = std::move(trxs), .dag_block = block};
   if (!sealAndSend(peer->getId(), SubprotocolPacketType::kDagBlockPacket, encodePacketRlp(dag_block_packet))) {
+    ++prometheus_packet_stats_.failed_send_dag;
     LOG(log_wr_) << "Sending DagBlock " << block->getHash() << " failed to " << peer->getId();
     return;
   }
+
+  ++prometheus_packet_stats_.send_dag;
 
   // Mark data as known if sending was successful
   peer->markDagBlockAsKnown(block->getHash());
@@ -69,16 +75,26 @@ void DagBlockPacketHandler::onNewBlockReceived(
   auto verified = dag_mgr_->verifyBlock(block, trxs);
   switch (verified.first) {
     case DagManager::VerifyBlockReturnType::IncorrectTransactionsEstimation:
+      ++prometheus_packet_stats_.dropped_incorrect_transactions_estimation_dag;
+      [[fallthrough]];
     case DagManager::VerifyBlockReturnType::BlockTooBig:
+      ++prometheus_packet_stats_.dropped_too_big_dag;
+      [[fallthrough]];
     case DagManager::VerifyBlockReturnType::FailedVdfVerification:
+      ++prometheus_packet_stats_.dropped_failed_vdf_verification_dag;
+      [[fallthrough]];
     case DagManager::VerifyBlockReturnType::NotEligible:
+      ++prometheus_packet_stats_.dropped_not_eligible_dag;
+      [[fallthrough]];
     case DagManager::VerifyBlockReturnType::FailedTipsVerification: {
+      ++prometheus_packet_stats_.dropped_failed_tips_verification_dag;
       std::ostringstream err_msg;
       err_msg << "DagBlock " << block_hash << " failed verification with error code "
               << static_cast<uint32_t>(verified.first);
       throw MaliciousPeerException(err_msg.str());
     }
     case DagManager::VerifyBlockReturnType::MissingTransaction:
+      ++prometheus_packet_stats_.dropped_missing_transactions_dag;
       if (peer->dagSyncingAllowed()) {
         if (trx_mgr_->transactionsDropped()) [[unlikely]] {
           LOG(log_nf_) << "NewBlock " << block_hash.toString() << " from peer " << peer->getId()
@@ -103,6 +119,7 @@ void DagBlockPacketHandler::onNewBlockReceived(
       }
       break;
     case DagManager::VerifyBlockReturnType::MissingTip:
+      ++prometheus_packet_stats_.dropped_missing_tip_dag;
       if (peer->peer_dag_synced_) {
         if (peer->dagSyncingAllowed()) {
           LOG(log_wr_) << "NewBlock " << block_hash.toString() << " from peer " << peer->getId()
@@ -120,7 +137,10 @@ void DagBlockPacketHandler::onNewBlockReceived(
       }
       break;
     case DagManager::VerifyBlockReturnType::AheadBlock:
+      ++prometheus_packet_stats_.dropped_ahead_dag;
+      [[fallthrough]];
     case DagManager::VerifyBlockReturnType::FutureBlock:
+      ++prometheus_packet_stats_.dropped_future_dag;
       if (peer->peer_dag_synced_) {
         LOG(log_er_) << "DagBlock" << block_hash << " is an ahead/future block. Peer " << peer->getId()
                      << " will be disconnected";
@@ -128,6 +148,7 @@ void DagBlockPacketHandler::onNewBlockReceived(
       }
       break;
     case DagManager::VerifyBlockReturnType::Verified: {
+      ++prometheus_packet_stats_.verified_dag;
       auto status = dag_mgr_->addDagBlock(block, std::move(verified.second));
       if (!status.first) {
         LOG(log_dg_) << "Received DagBlockPacket " << block_hash << "from: " << peer->getId();
@@ -152,6 +173,7 @@ void DagBlockPacketHandler::onNewBlockReceived(
       }
     } break;
     case DagManager::VerifyBlockReturnType::ExpiredBlock:
+      ++prometheus_packet_stats_.dropped_expired_dag;
       break;
   }
 }
@@ -161,6 +183,7 @@ void DagBlockPacketHandler::onNewBlockVerified(const std::shared_ptr<DagBlock> &
   // If node is pbft syncing and block is not proposed by us, this is an old block that has been verified - no block
   // gossip is needed
   if (!proposed && pbft_syncing_state_->isDeepPbftSyncing()) {
+    ++prometheus_packet_stats_.dropped_send_sync_dag;
     return;
   }
 
@@ -177,6 +200,7 @@ void DagBlockPacketHandler::onNewBlockVerified(const std::shared_ptr<DagBlock> &
   // Sending it in same order favours some peers over others, always start with a different position
   const auto peers_to_send_count = peers_to_send.size();
   if (peers_to_send_count == 0) {
+    ++prometheus_packet_stats_.dropped_send_no_peers_dag;
     return;
   }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <prometheus/counter.h>
 #include <prometheus/gauge.h>
 #include <prometheus/histogram.h>
 #include <prometheus/registry.h>
@@ -18,12 +19,21 @@ namespace taraxa::metrics {
   }
 
 /**
+ * @brief add method that is setting specific counter metric.
+ */
+#define ADD_COUNTER_METRIC(method, name, description)                                                  \
+  void method(double v) {                                                                              \
+    static auto& label = addMetric<prometheus::Counter>(group_name + "_" + name, description).Add({}); \
+    label.Increment(v);                                                                                \
+  }
+
+/**
  * @brief add method that is setting specific histogram metric.
  */
-#define ADD_HISTOGRAM_METRIC(method, name, description, buckets)                                          \
-  void method(double v, std::map<std::string, std::string> labels) {                                      \
-    static auto& label = addMetric<prometheus::Histogram>(group_name + "_" + name, description);          \
-    label.Add(labels, prometheus::Histogram::BucketBoundaries{buckets.begin(), buckets.end()}).Observe(v);\
+#define ADD_HISTOGRAM_METRIC(method, name, description, buckets)                                           \
+  void method(double v, std::map<std::string, std::string> labels) {                                       \
+    static auto& label = addMetric<prometheus::Histogram>(group_name + "_" + name, description);           \
+    label.Add(labels, prometheus::Histogram::BucketBoundaries{buckets.begin(), buckets.end()}).Observe(v); \
   }
 
 /**
@@ -41,6 +51,13 @@ namespace taraxa::metrics {
  */
 #define ADD_GAUGE_METRIC_WITH_UPDATER(method, name, description) \
   ADD_GAUGE_METRIC(method, name, description)                    \
+  ADD_UPDATER_METHOD(method)
+
+/**
+ * @brief combines ADD_UPDATER_METHOD and ADD_COUNTER_METRIC
+ */
+#define ADD_COUNTER_METRIC_WITH_UPDATER(method, name, description) \
+  ADD_COUNTER_METRIC(method, name, description)                    \
   ADD_UPDATER_METHOD(method)
 
 class MetricsGroup {

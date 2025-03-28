@@ -6,14 +6,14 @@
 
 namespace taraxa::network::tarcap::v3 {
 
-ExtSyncingPacketHandler::ExtSyncingPacketHandler(const FullNodeConfig &conf, std::shared_ptr<PeersState> peers_state,
-                                                 std::shared_ptr<TimePeriodPacketsStats> packets_stats,
-                                                 std::shared_ptr<PbftSyncingState> pbft_syncing_state,
-                                                 std::shared_ptr<PbftChain> pbft_chain,
-                                                 std::shared_ptr<PbftManager> pbft_mgr,
-                                                 std::shared_ptr<DagManager> dag_mgr, std::shared_ptr<DbStorage> db,
-                                                 const addr_t &node_addr, const std::string &log_channel_name)
-    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, log_channel_name),
+ExtSyncingPacketHandler::ExtSyncingPacketHandler(
+    const FullNodeConfig &conf, std::shared_ptr<PeersState> peers_state,
+    std::shared_ptr<TimePeriodPacketsStats> packets_stats, std::shared_ptr<PbftSyncingState> pbft_syncing_state,
+    std::shared_ptr<PbftChain> pbft_chain, std::shared_ptr<PbftManager> pbft_mgr, std::shared_ptr<DagManager> dag_mgr,
+    std::shared_ptr<DbStorage> db, const addr_t &node_addr, PrometheusPacketStats &prometheus_packet_stats,
+    const std::string &log_channel_name)
+    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, prometheus_packet_stats,
+                    log_channel_name),
       pbft_syncing_state_(std::move(pbft_syncing_state)),
       pbft_chain_(std::move(pbft_chain)),
       pbft_mgr_(std::move(pbft_mgr)),

@@ -8,8 +8,8 @@ GetPillarVotesBundlePacketHandler::GetPillarVotesBundlePacketHandler(
     const FullNodeConfig &conf, std::shared_ptr<PeersState> peers_state,
     std::shared_ptr<TimePeriodPacketsStats> packets_stats,
     std::shared_ptr<pillar_chain::PillarChainManager> pillar_chain_manager, const addr_t &node_addr,
-    const std::string &logs_prefix)
-    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr,
+    PrometheusPacketStats &prometheus_packet_stats, const std::string &logs_prefix)
+    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, prometheus_packet_stats,
                     logs_prefix + "GET_PILLAR_VOTES_BUNDLE_PH"),
       pillar_chain_manager_(std::move(pillar_chain_manager)) {}
 

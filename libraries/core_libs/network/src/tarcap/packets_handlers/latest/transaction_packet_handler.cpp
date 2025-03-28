@@ -11,11 +11,14 @@ namespace taraxa::network::tarcap {
 TransactionPacketHandler::TransactionPacketHandler(const FullNodeConfig &conf, std::shared_ptr<PeersState> peers_state,
                                                    std::shared_ptr<TimePeriodPacketsStats> packets_stats,
                                                    std::shared_ptr<TransactionManager> trx_mgr, const addr_t &node_addr,
+                                                   PrometheusPacketStats &prometheus_packet_stats,
                                                    const std::string &logs_prefix)
-    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, logs_prefix + "TRANSACTION_PH"),
+    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, prometheus_packet_stats,
+                    logs_prefix + "TRANSACTION_PH"),
       trx_mgr_(std::move(trx_mgr)) {}
 
 inline void TransactionPacketHandler::process(TransactionPacket &&packet, const std::shared_ptr<TaraxaPeer> &peer) {
+  ++prometheus_packet_stats_.received_tx;
   if (packet.transactions.size() > kMaxTransactionsInPacket) {
     throw InvalidRlpItemsCountException("TransactionPacket:transactions", packet.transactions.size(),
                                         kMaxTransactionsInPacket);

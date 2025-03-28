@@ -15,14 +15,16 @@ PbftSyncPacketHandler::PbftSyncPacketHandler(const FullNodeConfig &conf, std::sh
                                              std::shared_ptr<PbftChain> pbft_chain,
                                              std::shared_ptr<PbftManager> pbft_mgr, std::shared_ptr<DagManager> dag_mgr,
                                              std::shared_ptr<VoteManager> vote_mgr, std::shared_ptr<DbStorage> db,
-                                             const addr_t &node_addr, const std::string &logs_prefix)
+                                             const addr_t &node_addr, PrometheusPacketStats &prometheus_packet_stats,
+                                             const std::string &logs_prefix)
     : ExtSyncingPacketHandler(conf, std::move(peers_state), std::move(packets_stats), std::move(pbft_syncing_state),
                               std::move(pbft_chain), std::move(pbft_mgr), std::move(dag_mgr), std::move(db), node_addr,
-                              logs_prefix + "PBFT_SYNC_PH"),
+                              prometheus_packet_stats, logs_prefix + "PBFT_SYNC_PH"),
       vote_mgr_(std::move(vote_mgr)),
       periodic_events_tp_(1, true) {}
 
 void PbftSyncPacketHandler::process(PbftSyncPacket &&packet, const std::shared_ptr<TaraxaPeer> &peer) {
+  ++prometheus_packet_stats_.received_pbft_sync;
   // Note: no need to consider possible race conditions due to concurrent processing as it is
   // disabled on priority_queue blocking dependencies level
   const auto syncing_peer = pbft_syncing_state_->syncingPeer();

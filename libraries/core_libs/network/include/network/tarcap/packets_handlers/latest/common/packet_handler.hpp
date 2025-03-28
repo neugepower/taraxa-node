@@ -11,12 +11,14 @@
 #include "network/tarcap/packets/latest/get_next_votes_bundle_packet.hpp"
 #include "network/tarcap/packets_handlers/latest/common/base_packet_handler.hpp"
 #include "network/tarcap/packets_handlers/latest/common/exceptions.hpp"
+#include "network/tarcap/prometheus_packet_stats.hpp"
 #include "network/tarcap/shared_states/peers_state.hpp"
 #include "network/tarcap/stats/time_period_packets_stats.hpp"
 #include "network/tarcap/taraxa_peer.hpp"
 #include "network/threadpool/packet_data.hpp"
 
 namespace taraxa::network::tarcap {
+struct PrometheusPacketStats;
 
 template <class PacketType>
 PacketType decodePacketRlp(const dev::RLP& packet_rlp) {
@@ -36,8 +38,11 @@ class PacketHandler : public BasePacketHandler {
  public:
   PacketHandler(const FullNodeConfig& conf, std::shared_ptr<PeersState> peers_state,
                 std::shared_ptr<TimePeriodPacketsStats> packets_stats, const addr_t& node_addr,
-                const std::string& log_channel_name)
-      : kConf(conf), peers_state_(std::move(peers_state)), packets_stats_(std::move(packets_stats)) {
+                PrometheusPacketStats& prometheus_packet_stats, const std::string& log_channel_name)
+      : kConf(conf),
+        peers_state_(std::move(peers_state)),
+        packets_stats_(std::move(packets_stats)),
+        prometheus_packet_stats_(prometheus_packet_stats) {
     LOG_OBJECTS_CREATE(log_channel_name);
   }
 
@@ -61,6 +66,7 @@ class PacketHandler : public BasePacketHandler {
       // in the meantime the connection was lost and we started to process packet from such peer
       const auto peer = peers_state_->getPacketSenderPeer(packet_data.from_node_id_, packet_data.type_);
       if (!peer.first) [[unlikely]] {
+        ++prometheus_packet_stats_.dropped_peer_lost;
         LOG(log_wr_) << "Unable to process packet. Reason: " << peer.second;
         disconnect(packet_data.from_node_id_, dev::p2p::UserReason);
         return;
@@ -85,6 +91,7 @@ class PacketHandler : public BasePacketHandler {
       }
 
     } catch (const MaliciousPeerException& e) {
+      ++prometheus_packet_stats_.dropped_malicious_peer;
       // thrown during packets processing -> malicious peer, invalid rlp items count, ...
       // If there is custom peer set in exception, disconnect him, not packet sender
       if (const auto custom_peer = e.getPeer(); custom_peer.has_value()) {
@@ -95,16 +102,20 @@ class PacketHandler : public BasePacketHandler {
                                 true /* set peer as malicious */);
       }
     } catch (const PacketProcessingException& e) {
+      ++prometheus_packet_stats_.dropped_packet_bad;
       // thrown during packets processing...
       handle_caught_exception(e.what(), packet_data, packet_data.from_node_id_, e.getDisconnectReason(),
                               true /* set peer as malicious */);
     } catch (const dev::RLPException& e) {
+      ++prometheus_packet_stats_.dropped_rlp_bad;
       // thrown during parsing inside aleth/libdevcore -> type mismatch
       handle_caught_exception(e.what(), packet_data, packet_data.from_node_id_, dev::p2p::DisconnectReason::BadProtocol,
                               true /* set peer as malicious */);
     } catch (const std::exception& e) {
+      ++prometheus_packet_stats_.dropped_unknown_error;
       handle_caught_exception(e.what(), packet_data, packet_data.from_node_id_);
     } catch (...) {
+      ++prometheus_packet_stats_.dropped_unknown_error;
       handle_caught_exception("Unknown exception", packet_data, packet_data.from_node_id_);
     }
   }
@@ -188,6 +199,8 @@ class PacketHandler : public BasePacketHandler {
 
   // Shared packet stats
   std::shared_ptr<TimePeriodPacketsStats> packets_stats_;
+
+  PrometheusPacketStats& prometheus_packet_stats_;
 
   // Declare logger instances
   LOG_OBJECTS_DEFINE

@@ -9,16 +9,18 @@ GetPillarVotesBundlePacketHandler::GetPillarVotesBundlePacketHandler(
     const FullNodeConfig &conf, std::shared_ptr<PeersState> peers_state,
     std::shared_ptr<TimePeriodPacketsStats> packets_stats,
     std::shared_ptr<pillar_chain::PillarChainManager> pillar_chain_manager, const addr_t &node_addr,
-    const std::string &logs_prefix)
-    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr,
+    PrometheusPacketStats &prometheus_packet_stats, const std::string &logs_prefix)
+    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, prometheus_packet_stats,
                     logs_prefix + "GET_PILLAR_VOTES_BUNDLE_PH"),
       pillar_chain_manager_(std::move(pillar_chain_manager)) {}
 
 void GetPillarVotesBundlePacketHandler::process(GetPillarVotesBundlePacket &&packet,
                                                 const std::shared_ptr<TaraxaPeer> &peer) {
+  ++prometheus_packet_stats_.received_get_pillar_bundle_vote;
   LOG(log_dg_) << "GetPillarVotesBundlePacketHandler received from peer " << peer->getId();
 
   if (!kConf.genesis.state.hardforks.ficus_hf.isFicusHardfork(packet.period)) {
+    ++prometheus_packet_stats_.dropped_get_pillar_bundle_old_period_vote;
     std::ostringstream err_msg;
     err_msg << "Pillar votes bundle request for period " << packet.period << ", ficus hardfork block num "
             << kConf.genesis.state.hardforks.ficus_hf.block_num;
@@ -26,6 +28,7 @@ void GetPillarVotesBundlePacketHandler::process(GetPillarVotesBundlePacket &&pac
   }
 
   if (!kConf.genesis.state.hardforks.ficus_hf.isPbftWithPillarBlockPeriod(packet.period)) {
+    ++prometheus_packet_stats_.dropped_get_pillar_bundle_wrong_period_vote;
     std::ostringstream err_msg;
     err_msg << "Pillar votes bundle request for period " << packet.period << ". Wrong requested period";
     throw MaliciousPeerException(err_msg.str());
@@ -33,6 +36,7 @@ void GetPillarVotesBundlePacketHandler::process(GetPillarVotesBundlePacket &&pac
 
   const auto votes = pillar_chain_manager_->getVerifiedPillarVotes(packet.period, packet.pillar_block_hash);
   if (votes.empty()) {
+    ++prometheus_packet_stats_.dropped_get_pillar_bundle_empty_vote;
     LOG(log_dg_) << "No pillar votes for period " << packet.period << "and pillar block hash "
                  << packet.pillar_block_hash;
     return;
@@ -57,6 +61,7 @@ void GetPillarVotesBundlePacketHandler::process(GetPillarVotesBundlePacket &&pac
     // Seal and send the chunk to the peer
     if (sealAndSend(peer->getId(), SubprotocolPacketType::kPillarVotesBundlePacket,
                     encodePacketRlp(pillar_votes_bundle_packet))) {
+      ++prometheus_packet_stats_.send_pillar_bundle_vote;
       // Mark the votes in this chunk as known
       for (size_t i = 0; i < chunk_size; ++i) {
         peer->markPillarVoteAsKnown(votes[votes_sent + i]->getHash());
@@ -77,6 +82,7 @@ void GetPillarVotesBundlePacketHandler::process(GetPillarVotesBundlePacket &&pac
 
 void GetPillarVotesBundlePacketHandler::requestPillarVotesBundle(PbftPeriod period, const blk_hash_t &pillar_block_hash,
                                                                  const std::shared_ptr<TaraxaPeer> &peer) {
+  ++prometheus_packet_stats_.request_pillar_bundle_vote;
   if (sealAndSend(peer->getId(), SubprotocolPacketType::kGetPillarVotesBundlePacket,
                   encodePacketRlp(GetPillarVotesBundlePacket(period, pillar_block_hash)))) {
     LOG(log_nf_) << "Requested pillar votes bundle for period " << period << " and pillar block " << pillar_block_hash

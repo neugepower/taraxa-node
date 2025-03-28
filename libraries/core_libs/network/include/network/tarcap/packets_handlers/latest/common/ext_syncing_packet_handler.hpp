@@ -21,13 +21,16 @@ class ExtSyncingPacketHandler : public PacketHandler<PacketType> {
                           std::shared_ptr<TimePeriodPacketsStats> packets_stats,
                           std::shared_ptr<PbftSyncingState> pbft_syncing_state, std::shared_ptr<PbftChain> pbft_chain,
                           std::shared_ptr<PbftManager> pbft_mgr, std::shared_ptr<DagManager> dag_mgr,
-                          std::shared_ptr<DbStorage> db, const addr_t &node_addr, const std::string &log_channel_name)
-      : PacketHandler<PacketType>(conf, std::move(peers_state), std::move(packets_stats), node_addr, log_channel_name),
+                          std::shared_ptr<DbStorage> db, const addr_t &node_addr,
+                          PrometheusPacketStats &prometheus_packet_stats, const std::string &log_channel_name)
+      : PacketHandler<PacketType>(conf, std::move(peers_state), std::move(packets_stats), node_addr,
+                                  prometheus_packet_stats, log_channel_name),
         pbft_syncing_state_(std::move(pbft_syncing_state)),
         pbft_chain_(std::move(pbft_chain)),
         pbft_mgr_(std::move(pbft_mgr)),
         dag_mgr_(std::move(dag_mgr)),
-        db_(std::move(db)) {}
+        db_(std::move(db)),
+        prometheus_packet_stats_(prometheus_packet_stats) {}
 
   virtual ~ExtSyncingPacketHandler() = default;
   ExtSyncingPacketHandler &operator=(const ExtSyncingPacketHandler &) = delete;
@@ -103,11 +106,13 @@ class ExtSyncingPacketHandler : public PacketHandler<PacketType> {
   }
 
   void requestDagBlocks(const dev::p2p::NodeID &_nodeID, std::vector<blk_hash_t> &&blocks, PbftPeriod period) {
+    ++prometheus_packet_stats_.request_send_dag;
     this->sealAndSend(_nodeID, SubprotocolPacketType::kGetDagSyncPacket,
                       encodePacketRlp(GetDagSyncPacket{period, std::move(blocks)}));
   }
 
   void requestPendingDagBlocks(std::shared_ptr<TaraxaPeer> peer = nullptr) {
+    ++prometheus_packet_stats_.request_dag;
     if (!peer) {
       peer = getMaxChainPeer([](const std::shared_ptr<TaraxaPeer> &peer) {
         if (peer->peer_dag_synced_ || !peer->dagSyncingAllowed()) {
@@ -116,18 +121,21 @@ class ExtSyncingPacketHandler : public PacketHandler<PacketType> {
         return true;
       });
       if (!peer) {
+        ++prometheus_packet_stats_.request_failed_no_peer_match_dag;
         LOG(this->log_nf_) << "requestPendingDagBlocks not possible since no peers are matching conditions";
         return;
       }
     }
 
     if (!peer) {
+      ++prometheus_packet_stats_.request_failed_no_peers_dag;
       LOG(this->log_nf_) << "requestPendingDagBlocks not possible since no connected peers";
       return;
     }
 
     // This prevents ddos requesting dag blocks. We can only request this one time from one peer.
     if (peer->peer_dag_synced_) {
+      ++prometheus_packet_stats_.request_failed_already_requested_from_peer_dag;
       LOG(this->log_nf_) << "requestPendingDagBlocks not possible since already requested for peer";
       return;
     }
@@ -137,6 +145,7 @@ class ExtSyncingPacketHandler : public PacketHandler<PacketType> {
     if (pbft_sync_period == peer->pbft_chain_size_) {
       // This prevents parallel requests
       if (bool b = false; !peer->peer_dag_syncing_.compare_exchange_strong(b, !b)) {
+        ++prometheus_packet_stats_.request_failed_already_requested_from_peer_dag;
         LOG(this->log_nf_) << "requestPendingDagBlocks not possible since already requesting for peer";
         return;
       }
@@ -150,6 +159,8 @@ class ExtSyncingPacketHandler : public PacketHandler<PacketType> {
       }
 
       requestDagBlocks(peer->getId(), std::move(known_non_finalized_blocks), period);
+    } else {
+      ++prometheus_packet_stats_.request_failed_unmatched_period_dag;
     }
   }
 
@@ -193,6 +204,8 @@ class ExtSyncingPacketHandler : public PacketHandler<PacketType> {
   std::shared_ptr<PbftManager> pbft_mgr_{nullptr};
   std::shared_ptr<DagManager> dag_mgr_{nullptr};
   std::shared_ptr<DbStorage> db_{nullptr};
+
+  PrometheusPacketStats &prometheus_packet_stats_;
 };
 
 }  // namespace taraxa::network::tarcap

@@ -17,6 +17,7 @@ class TransactionPacketHandler : public PacketHandler {
   TransactionPacketHandler(const FullNodeConfig& conf, std::shared_ptr<PeersState> peers_state,
                            std::shared_ptr<TimePeriodPacketsStats> packets_stats,
                            std::shared_ptr<TransactionManager> trx_mgr, const addr_t& node_addr,
+                           PrometheusPacketStats& prometheus_packet_stats,
                            const std::string& logs_prefix = "TRANSACTION_PH");
 
   /**

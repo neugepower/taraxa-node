@@ -10,15 +10,20 @@ GetDagSyncPacketHandler::GetDagSyncPacketHandler(const FullNodeConfig &conf, std
                                                  std::shared_ptr<TimePeriodPacketsStats> packets_stats,
                                                  std::shared_ptr<TransactionManager> trx_mgr,
                                                  std::shared_ptr<DagManager> dag_mgr, std::shared_ptr<DbStorage> db,
-                                                 const addr_t &node_addr, const std::string &logs_prefix)
-    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, logs_prefix + "GET_DAG_SYNC_PH"),
+                                                 const addr_t &node_addr,
+                                                 PrometheusPacketStats &prometheus_packet_stats,
+                                                 const std::string &logs_prefix)
+    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, prometheus_packet_stats,
+                    logs_prefix + "GET_DAG_SYNC_PH"),
       trx_mgr_(std::move(trx_mgr)),
       dag_mgr_(std::move(dag_mgr)),
       db_(std::move(db)) {}
 
 void GetDagSyncPacketHandler::process(GetDagSyncPacket &&packet,
                                       [[maybe_unused]] const std::shared_ptr<TaraxaPeer> &peer) {
+  ++prometheus_packet_stats_.received_get_sync_dag;
   if (!peer->requestDagSyncingAllowed()) {
+    ++prometheus_packet_stats_.dropped_not_allowed_get_sync_dag;
     // This should not be possible for honest node
     // Each node should perform dag syncing only when allowed
     std::ostringstream err_msg;
@@ -61,8 +66,9 @@ void GetDagSyncPacketHandler::sendBlocks(const dev::p2p::NodeID &peer_id,
                                          PbftPeriod period) {
   auto peer = peers_state_->getPeer(peer_id);
   if (!peer) return;
+  ++prometheus_packet_stats_.send_get_sync_dag;
 
-  DagSyncPacket dag_sync_packet(request_period, period, std::move(transactions), std::move(blocks));
+  DagSyncPacket dag_sync_packet{request_period, period, std::move(transactions), std::move(blocks)};
   sealAndSend(peer_id, SubprotocolPacketType::kDagSyncPacket, encodePacketRlp(dag_sync_packet));
 }
 

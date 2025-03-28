@@ -1,15 +1,18 @@
 #include "network/threadpool/tarcap_thread_pool.hpp"
 
 #include "network/tarcap/packets_handler.hpp"
+#include "network/tarcap/prometheus_packet_stats.hpp"
 
 namespace taraxa::network::threadpool {
 
-PacketsThreadPool::PacketsThreadPool(size_t workers_num, const addr_t& node_addr)
-    : workers_num_(workers_num),
+PacketsThreadPool::PacketsThreadPool(tarcap::PrometheusPacketStats& prometheus_packet_stats, size_t workers_num,
+                                     const addr_t& node_addr)
+    : prometheus_packet_stats_(prometheus_packet_stats),
+      workers_num_(workers_num),
       packets_handlers_(),
       stopProcessing_(false),
       packets_count_(0),
-      queue_(workers_num, node_addr),
+      queue_(workers_num, prometheus_packet_stats, node_addr),
       queue_mutex_(),
       cond_var_(),
       workers_() {
@@ -32,6 +35,8 @@ PacketsThreadPool::~PacketsThreadPool() {
  * @return packet unique ID. In case push was not successful, empty optional is returned
  **/
 std::optional<uint64_t> PacketsThreadPool::push(std::pair<tarcap::TarcapVersion, PacketData>&& packet_data) {
+  ++prometheus_packet_stats_.received_thread_pool;
+
   if (stopProcessing_) {
     LOG(log_wr_) << "Trying to push packet while tp processing is stopped";
     return {};
@@ -123,10 +128,12 @@ void PacketsThreadPool::processPacket(size_t worker_id) {
       // Process packet by specific packet type handler
       handler->processPacket(packet->second);
     } catch (const std::exception& e) {
+      ++prometheus_packet_stats_.dropped_wrong_tarcap_version;
       LOG(log_er_) << "Worker (" << worker_id << ") process packet: " << packet->second.type_str_
                    << ", id: " << packet->second.id_ << ", tarcap version: " << packet->first
                    << " processing exception caught: " << e.what();
     } catch (...) {
+      ++prometheus_packet_stats_.dropped_unknown_error;
       LOG(log_er_) << "Worker (" << worker_id << ") process packet: " << packet->second.type_str_
                    << ", id: " << packet->second.id_ << ", tarcap version: " << packet->first
                    << " processing unknown exception caught";

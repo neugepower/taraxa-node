@@ -16,6 +16,7 @@ class GetNextVotesBundlePacketHandler : public ExtVotesPacketHandler {
                                   std::shared_ptr<PbftManager> pbft_mgr, std::shared_ptr<PbftChain> pbft_chain,
                                   std::shared_ptr<VoteManager> vote_mgr,
                                   std::shared_ptr<SlashingManager> slashing_manager, const addr_t& node_addr,
+                                  PrometheusPacketStats& prometheus_packet_stats,
                                   const std::string& logs_prefix = "GET_NEXT_VOTES_BUNDLE_PH");
 
   // Packet type that is processed by this handler

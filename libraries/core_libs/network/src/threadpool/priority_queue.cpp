@@ -2,8 +2,12 @@
 
 namespace taraxa::network::threadpool {
 
-PriorityQueue::PriorityQueue(size_t tp_workers_count, const addr_t& node_addr)
-    : blocked_packets_mask_(), MAX_TOTAL_WORKERS_COUNT(tp_workers_count), act_total_workers_count_(0) {
+PriorityQueue::PriorityQueue(size_t tp_workers_count, tarcap::PrometheusPacketStats& prometheus_packet_stats,
+                             const addr_t& node_addr)
+    : blocked_packets_mask_(),
+      MAX_TOTAL_WORKERS_COUNT(tp_workers_count),
+      act_total_workers_count_(0),
+      prometheus_packet_stats_(prometheus_packet_stats) {
   assert(packets_queues_.size() == PacketData::PacketPriority::Count);
   // tp_workers_count value should be validated (>=3) after it is read from config
   assert(tp_workers_count >= 3);
@@ -34,6 +38,9 @@ PriorityQueue::PriorityQueue(size_t tp_workers_count, const addr_t& node_addr)
 void PriorityQueue::pushBack(std::pair<tarcap::TarcapVersion, PacketData>&& packet) {
   const auto priority = packet.second.priority_;
   packets_queues_[priority].pushBack(std::move(packet));
+  prometheus_packet_stats_.queue_size_low = packets_queues_[PacketData::PacketPriority::Low].size();
+  prometheus_packet_stats_.queue_size_mid = packets_queues_[PacketData::PacketPriority::Mid].size();
+  prometheus_packet_stats_.queue_size_high = packets_queues_[PacketData::PacketPriority::High].size();
 }
 
 bool PriorityQueue::canBorrowThread() {
@@ -80,6 +87,9 @@ std::optional<std::pair<tarcap::TarcapVersion, PacketData>> PriorityQueue::pop()
     }
 
     if (auto packet = queue.pop(blocked_packets_mask_); packet.has_value()) {
+      prometheus_packet_stats_.queue_size_low = packets_queues_[PacketData::PacketPriority::Low].size();
+      prometheus_packet_stats_.queue_size_mid = packets_queues_[PacketData::PacketPriority::Mid].size();
+      prometheus_packet_stats_.queue_size_high = packets_queues_[PacketData::PacketPriority::High].size();
       return packet;
     }
 
@@ -105,6 +115,9 @@ std::optional<std::pair<tarcap::TarcapVersion, PacketData>> PriorityQueue::pop()
 
     if (auto packet = queue.pop(blocked_packets_mask_); packet.has_value()) {
       LOG(log_dg_) << "Thread for packet processing borrowed";
+      prometheus_packet_stats_.queue_size_low = packets_queues_[PacketData::PacketPriority::Low].size();
+      prometheus_packet_stats_.queue_size_mid = packets_queues_[PacketData::PacketPriority::Mid].size();
+      prometheus_packet_stats_.queue_size_high = packets_queues_[PacketData::PacketPriority::High].size();
       return packet;
     }
 

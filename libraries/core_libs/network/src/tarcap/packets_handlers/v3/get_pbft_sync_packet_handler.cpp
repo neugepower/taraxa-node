@@ -8,13 +8,12 @@
 #include "vote/votes_bundle_rlp.hpp"
 #include "vote_manager/vote_manager.hpp"
 namespace taraxa::network::tarcap::v3 {
-GetPbftSyncPacketHandler::GetPbftSyncPacketHandler(const FullNodeConfig &conf, std::shared_ptr<PeersState> peers_state,
-                                                   std::shared_ptr<TimePeriodPacketsStats> packets_stats,
-                                                   std::shared_ptr<PbftSyncingState> pbft_syncing_state,
-                                                   std::shared_ptr<PbftChain> pbft_chain,
-                                                   std::shared_ptr<VoteManager> vote_mgr, std::shared_ptr<DbStorage> db,
-                                                   const addr_t &node_addr, const std::string &logs_prefix)
-    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr,
+GetPbftSyncPacketHandler::GetPbftSyncPacketHandler(
+    const FullNodeConfig &conf, std::shared_ptr<PeersState> peers_state,
+    std::shared_ptr<TimePeriodPacketsStats> packets_stats, std::shared_ptr<PbftSyncingState> pbft_syncing_state,
+    std::shared_ptr<PbftChain> pbft_chain, std::shared_ptr<VoteManager> vote_mgr, std::shared_ptr<DbStorage> db,
+    const addr_t &node_addr, PrometheusPacketStats &prometheus_packet_stats, const std::string &logs_prefix)
+    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, prometheus_packet_stats,
                     logs_prefix + "GET_PBFT_SYNC_PH"),
       pbft_syncing_state_(std::move(pbft_syncing_state)),
       pbft_chain_(std::move(pbft_chain)),

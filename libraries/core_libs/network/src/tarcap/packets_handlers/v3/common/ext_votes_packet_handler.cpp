@@ -14,8 +14,10 @@ ExtVotesPacketHandler::ExtVotesPacketHandler(const FullNodeConfig &conf, std::sh
                                              std::shared_ptr<PbftChain> pbft_chain,
                                              std::shared_ptr<VoteManager> vote_mgr,
                                              std::shared_ptr<SlashingManager> slashing_manager, const addr_t &node_addr,
+                                             PrometheusPacketStats &prometheus_packet_stats,
                                              const std::string &log_channel_name)
-    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, log_channel_name),
+    : PacketHandler(conf, std::move(peers_state), std::move(packets_stats), node_addr, prometheus_packet_stats,
+                    log_channel_name),
       last_votes_sync_request_time_(std::chrono::system_clock::now()),
       last_pbft_block_sync_request_time_(std::chrono::system_clock::now()),
       pbft_mgr_(std::move(pbft_mgr)),

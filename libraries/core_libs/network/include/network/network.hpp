@@ -11,6 +11,7 @@
 
 #include "common/thread_pool.hpp"
 #include "config/config.hpp"
+#include "network/tarcap/prometheus_packet_stats.hpp"
 #include "network/tarcap/taraxa_capability.hpp"
 #include "network/tarcap/tarcap_version.hpp"
 #include "transaction/transaction.hpp"
@@ -78,6 +79,8 @@ class Network {
    */
   bool packetQueueOverLimit() const;
 
+  network::tarcap::PrometheusPacketStats &getPrometheusPacketStats() { return prometheus_packet_stats_; }
+
   // METHODS USED IN TESTS ONLY
   template <typename PacketHandlerType>
   std::shared_ptr<PacketHandlerType> getSpecificHandler() const;
@@ -124,6 +127,8 @@ class Network {
   std::map<network::tarcap::TarcapVersion, std::shared_ptr<network::tarcap::TaraxaCapability>,
            std::greater<network::tarcap::TarcapVersion>>
       tarcaps_;
+
+  network::tarcap::PrometheusPacketStats prometheus_packet_stats_;
 
   // Threadpool for packets
   std::shared_ptr<network::threadpool::PacketsThreadPool> packets_tp_;

@@ -7,12 +7,17 @@ namespace taraxa::network::tarcap {
 PillarVotePacketHandler::PillarVotePacketHandler(const FullNodeConfig &conf, std::shared_ptr<PeersState> peers_state,
                                                  std::shared_ptr<TimePeriodPacketsStats> packets_stats,
                                                  std::shared_ptr<pillar_chain::PillarChainManager> pillar_chain_manager,
-                                                 const addr_t &node_addr, const std::string &logs_prefix)
+                                                 const addr_t &node_addr,
+                                                 PrometheusPacketStats &prometheus_packet_stats,
+                                                 const std::string &logs_prefix)
     : ExtPillarVotePacketHandler(conf, std::move(peers_state), std::move(packets_stats),
-                                 std::move(pillar_chain_manager), node_addr, logs_prefix + "PILLAR_VOTE_PH") {}
+                                 std::move(pillar_chain_manager), node_addr, prometheus_packet_stats,
+                                 logs_prefix + "PILLAR_VOTE_PH") {}
 
 void PillarVotePacketHandler::process(PillarVotePacket &&packet, const std::shared_ptr<TaraxaPeer> &peer) {
+  ++prometheus_packet_stats_.received_pillar_vote;
   if (!kConf.genesis.state.hardforks.ficus_hf.isFicusHardfork(packet.pillar_vote->getPeriod())) {
+    ++prometheus_packet_stats_.dropped_pillar_old_period_vote;
     std::ostringstream err_msg;
     err_msg << "Pillar vote " << packet.pillar_vote->getHash() << ", period " << packet.pillar_vote->getPeriod()
             << " < ficus hardfork block num";
@@ -42,6 +47,7 @@ void PillarVotePacketHandler::onNewPillarVote(const std::shared_ptr<PillarVote> 
 
 void PillarVotePacketHandler::sendPillarVote(const std::shared_ptr<TaraxaPeer> &peer,
                                              const std::shared_ptr<PillarVote> &vote) {
+  ++prometheus_packet_stats_.send_pillar_vote;
   if (sealAndSend(peer->getId(), SubprotocolPacketType::kPillarVotePacket, encodePacketRlp(PillarVotePacket(vote)))) {
     peer->markPillarVoteAsKnown(vote->getHash());
     LOG(log_dg_) << "Pillar vote " << vote->getHash() << ", period " << vote->getPeriod() << " sent to "

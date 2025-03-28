@@ -14,15 +14,18 @@ DagSyncPacketHandler::DagSyncPacketHandler(const FullNodeConfig& conf, std::shar
                                            std::shared_ptr<PbftChain> pbft_chain, std::shared_ptr<PbftManager> pbft_mgr,
                                            std::shared_ptr<DagManager> dag_mgr,
                                            std::shared_ptr<TransactionManager> trx_mgr, std::shared_ptr<DbStorage> db,
-                                           const addr_t& node_addr, const std::string& logs_prefix)
+                                           const addr_t& node_addr, PrometheusPacketStats& prometheus_packet_stats,
+                                           const std::string& logs_prefix)
     : ExtSyncingPacketHandler(conf, std::move(peers_state), std::move(packets_stats), std::move(pbft_syncing_state),
                               std::move(pbft_chain), std::move(pbft_mgr), std::move(dag_mgr), std::move(db), node_addr,
-                              logs_prefix + "DAG_SYNC_PH"),
+                              prometheus_packet_stats, logs_prefix + "DAG_SYNC_PH"),
       trx_mgr_(std::move(trx_mgr)) {}
 
 void DagSyncPacketHandler::process(DagSyncPacket&& packet, const std::shared_ptr<TaraxaPeer>& peer) {
+  ++prometheus_packet_stats_.received_sync_dag;
   // If the periods did not match restart syncing
   if (packet.response_period > packet.request_period) {
+    ++prometheus_packet_stats_.dropped_past_period_sync_dag;
     LOG(log_dg_) << "Received DagSyncPacket with mismatching periods: " << packet.response_period << " "
                  << packet.request_period << " from " << peer->getId();
     if (peer->pbft_chain_size_ < packet.response_period) {
@@ -33,6 +36,7 @@ void DagSyncPacketHandler::process(DagSyncPacket&& packet, const std::shared_ptr
     startSyncingPbft();
     return;
   } else if (packet.response_period < packet.request_period) {
+    ++prometheus_packet_stats_.dropped_future_period_sync_dag;
     // This should not be possible for honest node
     std::ostringstream err_msg;
     err_msg << "Received DagSyncPacket with mismatching periods: response_period(" << packet.response_period
@@ -57,6 +61,7 @@ void DagSyncPacketHandler::process(DagSyncPacket&& packet, const std::shared_ptr
 
     auto [verified, reason] = trx_mgr_->verifyTransaction(trx, true);
     if (!verified) {
+      ++prometheus_packet_stats_.dropped_tx_invalid_sync_dag;
       std::ostringstream err_msg;
       err_msg << "DagBlock transaction " << tx_hash << " validation failed: " << reason;
       throw MaliciousPeerException(err_msg.str());
@@ -76,6 +81,7 @@ void DagSyncPacketHandler::process(DagSyncPacket&& packet, const std::shared_ptr
 
     auto verified = dag_mgr_->verifyBlock(block, transactions_map);
     if (verified.first != DagManager::VerifyBlockReturnType::Verified) {
+      ++prometheus_packet_stats_.dropped_invalid_verify_sync_dag;
       std::ostringstream err_msg;
       err_msg << "DagBlock " << block->getHash() << " failed verification with error code "
               << static_cast<uint32_t>(verified.first);
@@ -86,6 +92,7 @@ void DagSyncPacketHandler::process(DagSyncPacket&& packet, const std::shared_ptr
 
     auto status = dag_mgr_->addDagBlock(block, std::move(verified.second));
     if (!status.first) {
+      ++prometheus_packet_stats_.dropped_invalid_sync_dag;
       std::ostringstream err_msg;
       if (status.second.size() > 0)
         err_msg << "DagBlock" << block->getHash() << " has missing pivot or/and tips " << status.second;
@@ -94,6 +101,8 @@ void DagSyncPacketHandler::process(DagSyncPacket&& packet, const std::shared_ptr
       throw MaliciousPeerException(err_msg.str());
     }
   }
+
+  ++prometheus_packet_stats_.verified_sync_dag;
 
   peer->peer_dag_synced_ = true;
   peer->peer_dag_synced_time_ =
