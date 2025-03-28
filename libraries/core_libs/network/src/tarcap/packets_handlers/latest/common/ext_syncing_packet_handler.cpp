@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/common/ext_syncing_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets/latest/get_dag_sync_packet.hpp"
 #include "network/tarcap/packets/latest/get_pbft_sync_packet.hpp"
 #include "network/tarcap/shared_states/pbft_syncing_state.hpp"
@@ -23,6 +25,9 @@ ExtSyncingPacketHandler::ExtSyncingPacketHandler(const FullNodeConfig &conf, std
       db_(std::move(db)) {}
 
 void ExtSyncingPacketHandler::requestPendingDagBlocks(std::shared_ptr<TaraxaPeer> peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagRequested>();
   if (!peer) {
     peer = peers_state_->getMaxChainPeer(pbft_mgr_, [](const std::shared_ptr<TaraxaPeer> &peer) {
       if (peer->peer_dag_synced_ || !peer->dagSyncingAllowed()) {
@@ -31,18 +36,27 @@ void ExtSyncingPacketHandler::requestPendingDagBlocks(std::shared_ptr<TaraxaPeer
       return true;
     });
     if (!peer) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagRequestFailedNoMatch>();
       LOG(this->log_nf_) << "requestPendingDagBlocks not possible since no peers are matching conditions";
       return;
     }
   }
 
   if (!peer) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagRequestFailedNoPeers>();
     LOG(this->log_nf_) << "requestPendingDagBlocks not possible since no connected peers";
     return;
   }
 
   // This prevents ddos requesting dag blocks. We can only request this one time from one peer.
   if (peer->peer_dag_synced_) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagRequestFailedSynced>();
     LOG(this->log_nf_) << "requestPendingDagBlocks not possible since already requested for peer";
     return;
   }
@@ -52,6 +66,9 @@ void ExtSyncingPacketHandler::requestPendingDagBlocks(std::shared_ptr<TaraxaPeer
   if (pbft_sync_period == peer->pbft_chain_size_) {
     // This prevents parallel requests
     if (bool b = false; !peer->peer_dag_syncing_.compare_exchange_strong(b, !b)) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagRequestFailedOngoing>();
       LOG(this->log_nf_) << "requestPendingDagBlocks not possible since already requesting for peer";
       return;
     }
@@ -65,11 +82,18 @@ void ExtSyncingPacketHandler::requestPendingDagBlocks(std::shared_ptr<TaraxaPeer
     }
 
     requestDagBlocks(peer->getId(), std::move(known_non_finalized_blocks), period);
+  } else {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagRequestFailedPeriod>();
   }
 }
 
 void ExtSyncingPacketHandler::requestDagBlocks(const dev::p2p::NodeID &_nodeID, std::vector<blk_hash_t> &&blocks,
                                                PbftPeriod period) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagRequestSent>();
   this->sealAndSend(_nodeID, SubprotocolPacketType::kGetDagSyncPacket,
                     encodePacketRlp(GetDagSyncPacket{period, std::move(blocks)}));
 }

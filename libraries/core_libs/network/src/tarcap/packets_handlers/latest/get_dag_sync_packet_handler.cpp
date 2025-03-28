@@ -1,6 +1,8 @@
 #include "network/tarcap/packets_handlers/latest/get_dag_sync_packet_handler.hpp"
 
 #include "dag/dag_manager.hpp"
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets/latest/dag_sync_packet.hpp"
 #include "transaction/transaction_manager.hpp"
 
@@ -18,10 +20,16 @@ GetDagSyncPacketHandler::GetDagSyncPacketHandler(const FullNodeConfig &conf, std
 
 void GetDagSyncPacketHandler::process(const threadpool::PacketData &packet_data,
                                       [[maybe_unused]] const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagGetSyncReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<GetDagSyncPacket>(packet_data.rlp_);
 
   if (!peer->requestDagSyncingAllowed()) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagGetSyncDroppedNotAllowed>();
     // This should not be possible for honest node
     // Each node should perform dag syncing only when allowed
     std::ostringstream err_msg;
@@ -64,6 +72,9 @@ void GetDagSyncPacketHandler::sendBlocks(const dev::p2p::NodeID &peer_id,
                                          PbftPeriod period) {
   auto peer = peers_state_->getPeer(peer_id);
   if (!peer) return;
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagGetSyncSent>();
 
   DagSyncPacket dag_sync_packet(request_period, period, std::move(transactions), std::move(blocks));
   sealAndSend(peer_id, SubprotocolPacketType::kDagSyncPacket, encodePacketRlp(dag_sync_packet));

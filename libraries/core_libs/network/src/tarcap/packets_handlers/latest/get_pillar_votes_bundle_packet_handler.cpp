@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/get_pillar_votes_bundle_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets/latest/pillar_votes_bundle_packet.hpp"
 #include "network/tarcap/packets_handlers/latest/pillar_votes_bundle_packet_handler.hpp"
 
@@ -16,12 +18,18 @@ GetPillarVotesBundlePacketHandler::GetPillarVotesBundlePacketHandler(
 
 void GetPillarVotesBundlePacketHandler::process(const threadpool::PacketData &packet_data,
                                                 const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteGetBundleReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<GetPillarVotesBundlePacket>(packet_data.rlp_);
 
   LOG(log_dg_) << "GetPillarVotesBundlePacketHandler received from peer " << peer->getId();
 
   if (!kConf.genesis.state.hardforks.ficus_hf.isFicusHardfork(packet.period)) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteGetBundleDroppedOldPeriod>();
     std::ostringstream err_msg;
     err_msg << "Pillar votes bundle request for period " << packet.period << ", ficus hardfork block num "
             << kConf.genesis.state.hardforks.ficus_hf.block_num;
@@ -29,6 +37,9 @@ void GetPillarVotesBundlePacketHandler::process(const threadpool::PacketData &pa
   }
 
   if (!kConf.genesis.state.hardforks.ficus_hf.isPbftWithPillarBlockPeriod(packet.period)) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteGetBundleDroppedWrongPeriod>();
     std::ostringstream err_msg;
     err_msg << "Pillar votes bundle request for period " << packet.period << ". Wrong requested period";
     throw MaliciousPeerException(err_msg.str());
@@ -36,6 +47,9 @@ void GetPillarVotesBundlePacketHandler::process(const threadpool::PacketData &pa
 
   const auto votes = pillar_chain_manager_->getVerifiedPillarVotes(packet.period, packet.pillar_block_hash);
   if (votes.empty()) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteGetBundleDroppedEmpty>();
     LOG(log_dg_) << "No pillar votes for period " << packet.period << "and pillar block hash "
                  << packet.pillar_block_hash;
     return;
@@ -60,6 +74,9 @@ void GetPillarVotesBundlePacketHandler::process(const threadpool::PacketData &pa
     // Seal and send the chunk to the peer
     if (sealAndSend(peer->getId(), SubprotocolPacketType::kPillarVotesBundlePacket,
                     encodePacketRlp(pillar_votes_bundle_packet))) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteBundleSent>();
       // Mark the votes in this chunk as known
       for (size_t i = 0; i < chunk_size; ++i) {
         peer->markPillarVoteAsKnown(votes[votes_sent + i]->getHash());
@@ -80,6 +97,9 @@ void GetPillarVotesBundlePacketHandler::process(const threadpool::PacketData &pa
 
 void GetPillarVotesBundlePacketHandler::requestPillarVotesBundle(PbftPeriod period, const blk_hash_t &pillar_block_hash,
                                                                  const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteBundleRequested>();
   if (sealAndSend(peer->getId(), SubprotocolPacketType::kGetPillarVotesBundlePacket,
                   encodePacketRlp(GetPillarVotesBundlePacket(period, pillar_block_hash)))) {
     LOG(log_nf_) << "Requested pillar votes bundle for period " << period << " and pillar block " << pillar_block_hash

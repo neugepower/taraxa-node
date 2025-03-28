@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/pbft_blocks_bundle_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets/latest/pbft_blocks_bundle_packet.hpp"
 #include "network/tarcap/shared_states/pbft_syncing_state.hpp"
 #include "pbft/pbft_manager.hpp"
@@ -19,10 +21,16 @@ PbftBlocksBundlePacketHandler::PbftBlocksBundlePacketHandler(const FullNodeConfi
 
 void PbftBlocksBundlePacketHandler::process(const threadpool::PacketData &packet_data,
                                             const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPbftBundleReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<PbftBlocksBundlePacket>(packet_data.rlp_);
 
   if (packet.pbft_blocks.size() > kMaxBlocksInPacket) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPbftBundleTooLarge>();
     throw InvalidRlpItemsCountException("PbftBlocksBundlePacket:pbft_blocks", packet.pbft_blocks.size(),
                                         kMaxBlocksInPacket);
   }
@@ -31,6 +39,9 @@ void PbftBlocksBundlePacketHandler::process(const threadpool::PacketData &packet
   std::unordered_map<PbftPeriod, std::unordered_set<addr_t>> unique_authors;
 
   if (pbft_syncing_state_->lastSyncingPeer()->getId() != peer->getId()) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPbftBundleUnexpectedPeer>();
     LOG(log_er_) << "PbftBlocksBundlePacket received from unexpected peer " << peer->getId().abridged()
                  << " last syncing peer " << pbft_syncing_state_->lastSyncingPeer()->getId().abridged();
     // Note: do not throw MaliciousPeerException as in some edge cases node could be already syncing with new peer.
@@ -56,6 +67,9 @@ void PbftBlocksBundlePacketHandler::process(const threadpool::PacketData &packet
 
     // Check if block author is unique per period
     if (!unique_authors[proposed_block_period].insert(proposed_block_author).second) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPbftBundleNonUnique>();
       std::ostringstream err_msg;
       err_msg << "Proposed pbft blocks packet contains non-unique block author " << proposed_block_author;
       throw MaliciousPeerException(err_msg.str());
@@ -63,6 +77,9 @@ void PbftBlocksBundlePacketHandler::process(const threadpool::PacketData &packet
 
     // Check if block author is dpos eligible
     if (!pbft_mgr_->canParticipateInConsensus(proposed_block_period - 1, proposed_block_author)) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPbftBundleNonUnique>();
       std::ostringstream err_msg;
       err_msg << "Proposed pbft blocks packet contains non-eligible block author " << proposed_block_author
               << " for period " << proposed_block_period - 1;

@@ -1,5 +1,7 @@
 #include "network/threadpool/tarcap_thread_pool.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets_handler.hpp"
 #include "pbft/pbft_manager.hpp"
 
@@ -34,6 +36,10 @@ PacketsThreadPool::~PacketsThreadPool() {
  * @return packet unique ID. In case push was not successful, empty optional is returned
  **/
 std::optional<uint64_t> PacketsThreadPool::push(std::pair<tarcap::TarcapVersion, PacketData>&& packet_data) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsCleared>();
+
   if (stopProcessing_) {
     LOG(log_wr_) << "Trying to push packet while tp processing is stopped";
     return {};
@@ -125,10 +131,16 @@ void PacketsThreadPool::processPacket(size_t worker_id) {
       // Process packet by specific packet type handler
       handler->processPacket(packet->second);
     } catch (const std::exception& e) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedWrongTarcap>();
       LOG(log_er_) << "Worker (" << worker_id << ") process packet: " << packet->second.type_str_
                    << ", id: " << packet->second.id_ << ", tarcap version: " << packet->first
                    << " processing exception caught: " << e.what();
     } catch (...) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedUnknownError>();
       LOG(log_er_) << "Worker (" << worker_id << ") process packet: " << packet->second.type_str_
                    << ", id: " << packet->second.id_ << ", tarcap version: " << packet->first
                    << " processing unknown exception caught";

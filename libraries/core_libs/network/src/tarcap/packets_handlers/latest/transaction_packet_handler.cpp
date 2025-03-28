@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/transaction_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets/latest/transaction_packet.hpp"
 #include "transaction/transaction.hpp"
 #include "transaction/transaction_manager.hpp"
@@ -16,6 +18,9 @@ TransactionPacketHandler::TransactionPacketHandler(const FullNodeConfig &conf, s
 
 inline void TransactionPacketHandler::process(const threadpool::PacketData &packet_data,
                                               const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsTxReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<TransactionPacket>(packet_data.rlp_);
 

@@ -15,6 +15,7 @@
 #include "dag/dag_manager.hpp"
 #include "final_chain/final_chain.hpp"
 #include "key_manager/key_manager.hpp"
+#include "metrics/metrics_manager.hpp"
 #include "metrics/metrics_service.hpp"
 #include "metrics/network_metrics.hpp"
 #include "metrics/pbft_metrics.hpp"
@@ -113,8 +114,11 @@ void App::init(const cli::Config &cli_conf) {
     metrics_ =
         std::make_shared<metrics::MetricsService>(config.address, config.listen_port, config.polling_interval_ms);
   } else {
+    metrics_ = std::make_unique<metrics::MetricsServiceStub>();
     LOG(log_nf_) << "Prometheus: config values aren't specified. Metrics collecting is disabled";
   }
+
+  metrics::MetricsManager::instance().setMetricsService(*metrics_.get());
 
   final_chain_ = std::make_shared<final_chain::FinalChain>(db_, conf_, node_addr);
   gas_pricer_ = std::make_shared<GasPricer>(conf_.genesis, conf_.is_light_node, db_);
@@ -200,7 +204,7 @@ void App::start() {
 
   pbft_mgr_->start();
 
-  if (metrics_) {
+  if (conf_.network.prometheus) {
     setupMetricsUpdaters();
     metrics_->start();
   }
@@ -246,6 +250,8 @@ void App::scheduleLoggingConfigUpdate() {
 }
 
 void App::setupMetricsUpdaters() {
+  metrics::MetricsManager::instance().registerCounters();  // Register second flavor counters
+
   auto network_metrics = metrics_->getMetrics<metrics::NetworkMetrics>();
   network_metrics->setPeersCountUpdater([network = network_]() { return network->getPeerCount(); });
   network_metrics->setDiscoveredPeersCountUpdater([network = network_]() { return network->getNodeCount(); });

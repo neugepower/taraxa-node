@@ -1,5 +1,8 @@
 #include "network/tarcap/packets_handlers/interface/dag_block_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
+
 namespace taraxa::network::tarcap {
 
 IDagBlockPacketHandler::IDagBlockPacketHandler(const FullNodeConfig &conf, std::shared_ptr<PeersState> peers_state,
@@ -18,6 +21,9 @@ void IDagBlockPacketHandler::onNewBlockVerified(const std::shared_ptr<DagBlock> 
   // If node is pbft syncing and block is not proposed by us, this is an old block that has been verified - no block
   // gossip is needed
   if (!proposed && pbft_syncing_state_->isDeepPbftSyncing()) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSyncDroppedSend>();
     return;
   }
 
@@ -34,6 +40,9 @@ void IDagBlockPacketHandler::onNewBlockVerified(const std::shared_ptr<DagBlock> 
   // Sending it in same order favours some peers over others, always start with a different position
   const auto peers_to_send_count = peers_to_send.size();
   if (peers_to_send_count == 0) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSyncDroppedSendNoPeers>();
     return;
   }
 

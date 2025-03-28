@@ -36,6 +36,9 @@ PriorityQueue::PriorityQueue(size_t tp_workers_count, const std::shared_ptr<Pbft
 void PriorityQueue::pushBack(std::pair<tarcap::TarcapVersion, PacketData>&& packet) {
   const auto priority = packet.second.priority_;
   packets_queues_[priority].pushBack(std::move(packet));
+  // prometheus_packet_stats_.queue_size_low = packets_queues_[PacketData::PacketPriority::Low].size();
+  // prometheus_packet_stats_.queue_size_mid = packets_queues_[PacketData::PacketPriority::Mid].size();
+  // prometheus_packet_stats_.queue_size_high = packets_queues_[PacketData::PacketPriority::High].size();
 }
 
 bool PriorityQueue::canBorrowThread() {
@@ -82,6 +85,9 @@ std::optional<std::pair<tarcap::TarcapVersion, PacketData>> PriorityQueue::pop()
     }
 
     if (auto packet = queue.pop(blocked_packets_mask_); packet.has_value()) {
+      // prometheus_packet_stats_.queue_size_low = packets_queues_[PacketData::PacketPriority::Low].size();
+      // prometheus_packet_stats_.queue_size_mid = packets_queues_[PacketData::PacketPriority::Mid].size();
+      // prometheus_packet_stats_.queue_size_high = packets_queues_[PacketData::PacketPriority::High].size();
       return packet;
     }
 
@@ -107,6 +113,9 @@ std::optional<std::pair<tarcap::TarcapVersion, PacketData>> PriorityQueue::pop()
 
     if (auto packet = queue.pop(blocked_packets_mask_); packet.has_value()) {
       LOG(log_dg_) << "Thread for packet processing borrowed";
+      // prometheus_packet_stats_.queue_size_low = packets_queues_[PacketData::PacketPriority::Low].size();
+      // prometheus_packet_stats_.queue_size_mid = packets_queues_[PacketData::PacketPriority::Mid].size();
+      // prometheus_packet_stats_.queue_size_high = packets_queues_[PacketData::PacketPriority::High].size();
       return packet;
     }
 

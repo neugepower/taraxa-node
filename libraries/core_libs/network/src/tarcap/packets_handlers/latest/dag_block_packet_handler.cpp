@@ -1,6 +1,8 @@
 #include "network/tarcap/packets_handlers/latest/dag_block_packet_handler.hpp"
 
 #include "dag/dag_manager.hpp"
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets_handlers/latest/transaction_packet_handler.hpp"
 #include "network/tarcap/shared_states/pbft_syncing_state.hpp"
 #include "transaction/transaction_manager.hpp"
@@ -21,6 +23,9 @@ DagBlockPacketHandler::DagBlockPacketHandler(const FullNodeConfig &conf, std::sh
 
 void DagBlockPacketHandler::process(const threadpool::PacketData &packet_data,
                                     const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<DagBlockPacket>(packet_data.rlp_);
 
@@ -37,6 +42,9 @@ void DagBlockPacketHandler::process(const threadpool::PacketData &packet_data,
 
   // Do not process this block in case we already have it
   if (dag_mgr_->isDagBlockKnown(packet.dag_block->getHash())) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedKnown>();
     LOG(log_tr_) << "Received known DagBlockPacket " << hash << "from: " << peer->getId();
     return;
   }
@@ -58,9 +66,16 @@ void DagBlockPacketHandler::sendBlockWithTransactions(const std::shared_ptr<Tara
 
   DagBlockPacket dag_block_packet{.transactions = std::move(trxs), .dag_block = block};
   if (!sealAndSend(peer->getId(), SubprotocolPacketType::kDagBlockPacket, encodePacketRlp(dag_block_packet))) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSentFailed>();
     LOG(log_wr_) << "Sending DagBlock " << block->getHash() << " failed to " << peer->getId();
     return;
   }
+
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSent>();
 
   // Mark data as known if sending was successful
   peer->markDagBlockAsKnown(block->getHash());
@@ -72,17 +87,55 @@ void DagBlockPacketHandler::onNewBlockReceived(
   const auto block_hash = block->getHash();
   auto verified = dag_mgr_->verifyBlock(block, trxs);
   switch (verified.first) {
-    case DagManager::VerifyBlockReturnType::IncorrectTransactionsEstimation:
-    case DagManager::VerifyBlockReturnType::BlockTooBig:
-    case DagManager::VerifyBlockReturnType::FailedVdfVerification:
-    case DagManager::VerifyBlockReturnType::NotEligible:
+    case DagManager::VerifyBlockReturnType::IncorrectTransactionsEstimation: {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedTxEstimation>();
+      std::ostringstream err_msg;
+      err_msg << "DagBlock " << block_hash << " failed verification with error code "
+              << static_cast<uint32_t>(verified.first);
+      throw MaliciousPeerException(err_msg.str());
+    }
+    case DagManager::VerifyBlockReturnType::BlockTooBig: {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedBlockTooBig>();
+      std::ostringstream err_msg;
+      err_msg << "DagBlock " << block_hash << " failed verification with error code "
+              << static_cast<uint32_t>(verified.first);
+      throw MaliciousPeerException(err_msg.str());
+    }
+    case DagManager::VerifyBlockReturnType::FailedVdfVerification: {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedVdfFailed>();
+      std::ostringstream err_msg;
+      err_msg << "DagBlock " << block_hash << " failed verification with error code "
+              << static_cast<uint32_t>(verified.first);
+      throw MaliciousPeerException(err_msg.str());
+    }
+    case DagManager::VerifyBlockReturnType::NotEligible: {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedNotEligible>();
+      std::ostringstream err_msg;
+      err_msg << "DagBlock " << block_hash << " failed verification with error code "
+              << static_cast<uint32_t>(verified.first);
+      throw MaliciousPeerException(err_msg.str());
+    }
     case DagManager::VerifyBlockReturnType::FailedTipsVerification: {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedTipsVerifyFailed>();
       std::ostringstream err_msg;
       err_msg << "DagBlock " << block_hash << " failed verification with error code "
               << static_cast<uint32_t>(verified.first);
       throw MaliciousPeerException(err_msg.str());
     }
     case DagManager::VerifyBlockReturnType::MissingTransaction:
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedMissingTx>();
       if (peer->dagSyncingAllowed()) {
         if (trx_mgr_->transactionsDropped()) [[unlikely]] {
           LOG(log_nf_) << "NewBlock " << block_hash.toString() << " from peer " << peer->getId()
@@ -107,6 +160,9 @@ void DagBlockPacketHandler::onNewBlockReceived(
       }
       break;
     case DagManager::VerifyBlockReturnType::MissingTip:
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedMissingTip>();
       if (peer->peer_dag_synced_) {
         if (peer->dagSyncingAllowed()) {
           LOG(log_wr_) << "NewBlock " << block_hash.toString() << " from peer " << peer->getId()
@@ -123,8 +179,21 @@ void DagBlockPacketHandler::onNewBlockReceived(
         requestPendingDagBlocks(peer);
       }
       break;
-    case DagManager::VerifyBlockReturnType::AheadBlock:
+    case DagManager::VerifyBlockReturnType::AheadBlock: {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedAheadBlock>();
+      if (peer->peer_dag_synced_) {
+        LOG(log_er_) << "DagBlock" << block_hash << " is an ahead/future block. Peer " << peer->getId()
+                     << " will be disconnected";
+        disconnect(peer->getId(), dev::p2p::UserReason);
+      }
+      break;
+    }
     case DagManager::VerifyBlockReturnType::FutureBlock:
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedFutureBlock>();
       if (peer->peer_dag_synced_) {
         LOG(log_er_) << "DagBlock" << block_hash << " is an ahead/future block. Peer " << peer->getId()
                      << " will be disconnected";
@@ -132,6 +201,9 @@ void DagBlockPacketHandler::onNewBlockReceived(
       }
       break;
     case DagManager::VerifyBlockReturnType::Verified: {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagVerified>();
       auto status = dag_mgr_->addDagBlock(block, std::move(verified.second));
       if (!status.first) {
         LOG(log_dg_) << "Received DagBlockPacket " << block_hash << "from: " << peer->getId();
@@ -156,6 +228,9 @@ void DagBlockPacketHandler::onNewBlockReceived(
       }
     } break;
     case DagManager::VerifyBlockReturnType::ExpiredBlock:
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagDroppedExpired>();
       break;
   }
 }

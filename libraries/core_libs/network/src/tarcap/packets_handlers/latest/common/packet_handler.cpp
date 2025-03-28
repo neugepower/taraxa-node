@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/common/packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets_handlers/latest/common/exceptions.hpp"
 #include "network/tarcap/stats/time_period_packets_stats.hpp"
 
@@ -19,6 +21,9 @@ void PacketHandler::processPacket(const threadpool::PacketData& packet_data) {
     // in the meantime the connection was lost and we started to process packet from such peer
     const auto peer = peers_state_->getPacketSenderPeer(packet_data.from_node_id_, packet_data.type_);
     if (!peer.first) [[unlikely]] {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedPeerLost>();
       LOG(log_wr_) << "Unable to process packet. Reason: " << peer.second;
       disconnect(packet_data.from_node_id_, dev::p2p::UserReason);
       return;
@@ -40,6 +45,9 @@ void PacketHandler::processPacket(const threadpool::PacketData& packet_data) {
     }
 
   } catch (const MaliciousPeerException& e) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedMalicious>();
     // thrown during packets processing -> malicious peer, invalid rlp items count, ...
     // If there is custom peer set in exception, disconnect him, not packet sender
     if (const auto custom_peer = e.getPeer(); custom_peer.has_value()) {
@@ -50,16 +58,28 @@ void PacketHandler::processPacket(const threadpool::PacketData& packet_data) {
                               true /* set peer as malicious */);
     }
   } catch (const PacketProcessingException& e) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedBad>();
     // thrown during packets processing...
     handle_caught_exception(e.what(), packet_data, packet_data.from_node_id_, e.getDisconnectReason(),
                             true /* set peer as malicious */);
   } catch (const dev::RLPException& e) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedRlpBad>();
     // thrown during parsing inside aleth/libdevcore -> type mismatch
     handle_caught_exception(e.what(), packet_data, packet_data.from_node_id_, dev::p2p::DisconnectReason::BadProtocol,
                             true /* set peer as malicious */);
   } catch (const std::exception& e) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedUnknownError>();
     handle_caught_exception(e.what(), packet_data, packet_data.from_node_id_);
   } catch (...) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedUnknownError>();
     handle_caught_exception("Unknown exception", packet_data, packet_data.from_node_id_);
   }
 }

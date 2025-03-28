@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/vote_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets/latest/vote_packet.hpp"
 #include "pbft/pbft_manager.hpp"
 #include "vote_manager/vote_manager.hpp"
@@ -17,6 +19,9 @@ VotePacketHandler::VotePacketHandler(const FullNodeConfig &conf, std::shared_ptr
                          logs_prefix + "PBFT_VOTE_PH") {}
 
 void VotePacketHandler::process(const threadpool::PacketData &packet_data, const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsVoteReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<VotePacket>(packet_data.rlp_);
 

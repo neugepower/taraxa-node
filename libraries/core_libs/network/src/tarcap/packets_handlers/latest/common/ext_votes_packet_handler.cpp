@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/common/ext_votes_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets/latest/get_next_votes_bundle_packet.hpp"
 #include "network/tarcap/packets_handlers/latest/common/exceptions.hpp"
 #include "pbft/pbft_manager.hpp"
@@ -27,17 +29,29 @@ ExtVotesPacketHandler::ExtVotesPacketHandler(const FullNodeConfig &conf, std::sh
 bool ExtVotesPacketHandler::processVote(const std::shared_ptr<PbftVote> &vote,
                                         const std::shared_ptr<PbftBlock> &pbft_block,
                                         const std::shared_ptr<TaraxaPeer> &peer, bool validate_max_round_step) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsVotesReceived>();
   if (pbft_block && !validateVoteAndBlock(vote, pbft_block)) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsVotesBadActor>();
     throw MaliciousPeerException("Received vote's voted value != received pbft block");
   }
 
   if (vote_mgr_->voteInVerifiedMap(vote)) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsVotesDuplicate>();
     LOG(this->log_dg_) << "Vote " << vote->getHash() << " already inserted in verified queue";
     return false;
   }
 
   // Validate vote's period, round and step min/max values
   if (const auto vote_valid = validateVotePeriodRoundStep(vote, peer, validate_max_round_step); !vote_valid.first) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsVotesInvalid>();
     LOG(this->log_wr_) << "Vote period/round/step " << vote->getHash()
                        << " validation failed. Err: " << vote_valid.second;
     return false;
@@ -46,6 +60,9 @@ bool ExtVotesPacketHandler::processVote(const std::shared_ptr<PbftVote> &vote,
   // Check is vote is unique per period, round & step & voter -> each address can generate just 1 vote
   // (for a value that isn't NBH) per period, round & step
   if (auto vote_valid = vote_mgr_->isUniqueVote(vote); !vote_valid.first) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsVotesDoubleVote>();
     // Create double voting proof
     slashing_manager_->submitDoubleVotingProof(vote, vote_valid.second);
     throw MaliciousPeerException("Received double vote", vote->getVoter());
@@ -53,11 +70,17 @@ bool ExtVotesPacketHandler::processVote(const std::shared_ptr<PbftVote> &vote,
 
   // Validate vote's signature, vrf, etc...
   if (const auto vote_valid = vote_mgr_->validateVote(vote); !vote_valid.first) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsVotesDoubleVote>();
     LOG(this->log_wr_) << "Vote " << vote->getHash() << " validation failed. Err: " << vote_valid.second;
     return false;
   }
 
   if (!vote_mgr_->addVerifiedVote(vote)) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsVotesQueueRace>();
     LOG(this->log_dg_) << "Vote " << vote->getHash() << " already inserted in verified queue(race condition)";
     return false;
   }

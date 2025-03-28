@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/get_pbft_sync_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets/latest/pbft_blocks_bundle_packet.hpp"
 #include "network/tarcap/packets/latest/pbft_sync_packet.hpp"
 #include "network/tarcap/packets_handlers/latest/pbft_blocks_bundle_packet_handler.hpp"
@@ -30,6 +32,9 @@ GetPbftSyncPacketHandler::GetPbftSyncPacketHandler(const FullNodeConfig &conf, s
 
 void GetPbftSyncPacketHandler::process(const threadpool::PacketData &packet_data,
                                        const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPbftGetSyncReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<GetPbftSyncPacket>(packet_data.rlp_);
 

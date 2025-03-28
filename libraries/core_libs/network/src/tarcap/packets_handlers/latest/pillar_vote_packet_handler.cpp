@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/pillar_vote_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "vote/pillar_vote.hpp"
 
 namespace taraxa::network::tarcap {
@@ -13,10 +15,16 @@ PillarVotePacketHandler::PillarVotePacketHandler(const FullNodeConfig &conf, std
 
 void PillarVotePacketHandler::process(const threadpool::PacketData &packet_data,
                                       const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<PillarVotePacket>(packet_data.rlp_);
 
   if (!kConf.genesis.state.hardforks.ficus_hf.isFicusHardfork(packet.pillar_vote->getPeriod())) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteDroppedOldPeriod>();
     std::ostringstream err_msg;
     err_msg << "Pillar vote " << packet.pillar_vote->getHash() << ", period " << packet.pillar_vote->getPeriod()
             << " < ficus hardfork block num";
@@ -30,6 +38,9 @@ void PillarVotePacketHandler::process(const threadpool::PacketData &packet_data,
 
 void PillarVotePacketHandler::sendPillarVote(const std::shared_ptr<TaraxaPeer> &peer,
                                              const std::shared_ptr<PillarVote> &vote) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteSent>();
   if (sealAndSend(peer->getId(), SubprotocolPacketType::kPillarVotePacket, encodePacketRlp(PillarVotePacket(vote)))) {
     peer->markPillarVoteAsKnown(vote->getHash());
     LOG(log_dg_) << "Pillar vote " << vote->getHash() << ", period " << vote->getPeriod() << " sent to "

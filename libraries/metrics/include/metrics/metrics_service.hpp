@@ -16,12 +16,12 @@ namespace taraxa::metrics {
 class MetricsService {
  public:
   MetricsService(const std::string& host, uint16_t port, uint16_t polling_interval_ms);
-  ~MetricsService();
+  virtual ~MetricsService();
 
   /**
    * @brief method to start thread that collecting data from special classes
    */
-  void start();
+  virtual void start();
 
   /**
    * @brief method to get specific metrics instance.
@@ -49,4 +49,22 @@ class MetricsService {
   std::map<std::string, SharedMetricsGroup> metrics_;
   std::unique_ptr<std::thread> thread_;
 };
+
+/**
+ * @brief Stub class for metrics service.
+ * Used when metrics are disabled in config.
+ */
+class MetricsServiceStub : public MetricsService {
+ public:
+  MetricsServiceStub() : MetricsService("", 0, 0) {}
+
+  void start() override {}
+
+  template <class T>
+  std::shared_ptr<T> getMetrics() {
+    static auto metricsGroupStub = std::make_shared<MetricsGroupStub>();
+    return metricsGroupStub;
+  }
+};
+
 }  // namespace taraxa::metrics

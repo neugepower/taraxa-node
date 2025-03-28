@@ -1,6 +1,8 @@
 #include "network/tarcap/packets_handlers/latest/dag_sync_packet_handler.hpp"
 
 #include "dag/dag.hpp"
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets_handlers/latest/common/ext_syncing_packet_handler.hpp"
 #include "network/tarcap/shared_states/pbft_syncing_state.hpp"
 #include "transaction/transaction.hpp"
@@ -21,11 +23,17 @@ DagSyncPacketHandler::DagSyncPacketHandler(const FullNodeConfig& conf, std::shar
       trx_mgr_(std::move(trx_mgr)) {}
 
 void DagSyncPacketHandler::process(const threadpool::PacketData& packet_data, const std::shared_ptr<TaraxaPeer>& peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSyncReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<DagSyncPacket>(packet_data.rlp_);
 
   // If the periods did not match restart syncing
   if (packet.response_period > packet.request_period) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSyncDroppedPast>();
     LOG(log_dg_) << "Received DagSyncPacket with mismatching periods: " << packet.response_period << " "
                  << packet.request_period << " from " << peer->getId();
     if (peer->pbft_chain_size_ < packet.response_period) {
@@ -36,6 +44,9 @@ void DagSyncPacketHandler::process(const threadpool::PacketData& packet_data, co
     startSyncingPbft();
     return;
   } else if (packet.response_period < packet.request_period) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSyncDroppedFuture>();
     // This should not be possible for honest node
     std::ostringstream err_msg;
     err_msg << "Received DagSyncPacket with mismatching periods: response_period(" << packet.response_period
@@ -60,6 +71,9 @@ void DagSyncPacketHandler::process(const threadpool::PacketData& packet_data, co
 
     auto [verified, reason] = trx_mgr_->verifyTransaction(trx, true);
     if (!verified) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSyncDroppedTxInvalid>();
       std::ostringstream err_msg;
       err_msg << "DagBlock transaction " << tx_hash << " validation failed: " << reason;
       throw MaliciousPeerException(err_msg.str());
@@ -79,6 +93,9 @@ void DagSyncPacketHandler::process(const threadpool::PacketData& packet_data, co
 
     auto verified = dag_mgr_->verifyBlock(block, transactions_map);
     if (verified.first != DagManager::VerifyBlockReturnType::Verified) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSyncDroppedVerifyFailed>();
       std::ostringstream err_msg;
       err_msg << "DagBlock " << block->getHash() << " failed verification with error code "
               << static_cast<uint32_t>(verified.first);
@@ -89,6 +106,9 @@ void DagSyncPacketHandler::process(const threadpool::PacketData& packet_data, co
 
     auto status = dag_mgr_->addDagBlock(block, std::move(verified.second));
     if (!status.first) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSyncDroppedInvalid>();
       std::ostringstream err_msg;
       if (status.second.size() > 0)
         err_msg << "DagBlock" << block->getHash() << " has missing pivot or/and tips " << status.second;
@@ -97,6 +117,10 @@ void DagSyncPacketHandler::process(const threadpool::PacketData& packet_data, co
       throw MaliciousPeerException(err_msg.str());
     }
   }
+
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDagSyncVerified>();
 
   peer->peer_dag_synced_ = true;
   peer->peer_dag_synced_time_ =

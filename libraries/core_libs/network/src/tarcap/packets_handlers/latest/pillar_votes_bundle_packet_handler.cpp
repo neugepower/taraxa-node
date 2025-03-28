@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/pillar_votes_bundle_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "vote/pillar_vote.hpp"
 
 namespace taraxa::network::tarcap {
@@ -14,11 +16,17 @@ PillarVotesBundlePacketHandler::PillarVotesBundlePacketHandler(
 
 void PillarVotesBundlePacketHandler::process(const threadpool::PacketData &packet_data,
                                              const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteBundleReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<PillarVotesBundlePacket>(packet_data.rlp_);
 
   if (packet.pillar_votes_bundle.pillar_votes.size() == 0 ||
       packet.pillar_votes_bundle.pillar_votes.size() > kMaxPillarVotesInBundleRlp) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteBundleDroppedTooLarge>();
     throw InvalidRlpItemsCountException("PillarVotesBundlePacket", packet.pillar_votes_bundle.pillar_votes.size(),
                                         kMaxPillarVotesInBundleRlp);
   }
@@ -28,6 +36,9 @@ void PillarVotesBundlePacketHandler::process(const threadpool::PacketData &packe
 
   for (const auto &pillar_vote : packet.pillar_votes_bundle.pillar_votes) {
     if (!kConf.genesis.state.hardforks.ficus_hf.isFicusHardfork(pillar_vote->getPeriod())) {
+      metrics::MetricsManager::instance()
+          .getMetrics<metrics::NetworkMetrics>()
+          .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteBundleDroppedOldPeriod>();
       std::ostringstream err_msg;
       err_msg << "Synced pillar vote " << pillar_vote->getHash() << ", period " << pillar_vote->getPeriod()
               << " < ficus hardfork block num";

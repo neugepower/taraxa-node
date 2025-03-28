@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/get_next_votes_bundle_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "pbft/pbft_manager.hpp"
 #include "vote_manager/vote_manager.hpp"
 
@@ -16,6 +18,9 @@ GetNextVotesBundlePacketHandler::GetNextVotesBundlePacketHandler(
 
 void GetNextVotesBundlePacketHandler::process(const threadpool::PacketData &packet_data,
                                               const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsVoteGetNextReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<GetNextVotesBundlePacket>(packet_data.rlp_);
 

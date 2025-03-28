@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/votes_bundle_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "pbft/pbft_manager.hpp"
 #include "vote/votes_bundle_rlp.hpp"
 #include "vote_manager/vote_manager.hpp"
@@ -19,6 +21,9 @@ VotesBundlePacketHandler::VotesBundlePacketHandler(const FullNodeConfig &conf, s
 
 void VotesBundlePacketHandler::process(const threadpool::PacketData &packet_data,
                                        const std::shared_ptr<TaraxaPeer> &peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsVoteBundleReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<VotesBundlePacket>(packet_data.rlp_);
 

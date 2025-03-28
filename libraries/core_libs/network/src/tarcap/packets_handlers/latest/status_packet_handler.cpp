@@ -1,6 +1,8 @@
 #include "network/tarcap/packets_handlers/latest/status_packet_handler.hpp"
 
 #include "config/version.hpp"
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets/latest/get_next_votes_bundle_packet.hpp"
 #include "network/tarcap/packets/latest/status_packet.hpp"
 #include "network/tarcap/shared_states/pbft_syncing_state.hpp"
@@ -21,6 +23,9 @@ StatusPacketHandler::StatusPacketHandler(const FullNodeConfig& conf, std::shared
       kGenesisHash(genesis_hash) {}
 
 void StatusPacketHandler::process(const threadpool::PacketData& packet_data, const std::shared_ptr<TaraxaPeer>& peer) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsStatusReceived>();
   // Decode packet rlp into packet object
   auto packet = decodePacketRlp<StatusPacket>(packet_data.rlp_);
 

@@ -1,5 +1,7 @@
 #include "network/tarcap/packets_handlers/latest/common/ext_pillar_vote_packet_handler.hpp"
 
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "pillar_chain/pillar_chain_manager.hpp"
 
 namespace taraxa::network::tarcap {
@@ -15,18 +17,28 @@ ExtPillarVotePacketHandler::ExtPillarVotePacketHandler(
 bool ExtPillarVotePacketHandler::processPillarVote(const std::shared_ptr<PillarVote> &vote,
                                                    const std::shared_ptr<TaraxaPeer> &peer) {
   if (!pillar_chain_manager_->isRelevantPillarVote(vote)) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteDroppedIrrelevant>();
     LOG(this->log_dg_) << "Drop irrelevant pillar vote " << vote->getHash() << ", period " << vote->getPeriod()
                        << " from peer " << peer->getId();
     return false;
   }
 
   if (!pillar_chain_manager_->validatePillarVote(vote)) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteDroppedInvalid>();
     // TODO: enable for mainnet
     // std::ostringstream err_msg;
     // err_msg << "Invalid pillar vote " << vote->getHash() << " from peer " << peer->getId();
     // throw MaliciousPeerException(err_msg.str());
     return false;
   }
+
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsPillarVoteProcessed>();
 
   pillar_chain_manager_->addVerifiedPillarVote(vote);
 

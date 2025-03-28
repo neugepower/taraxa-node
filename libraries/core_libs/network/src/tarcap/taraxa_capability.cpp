@@ -1,6 +1,8 @@
 #include "network/tarcap/taraxa_capability.hpp"
 
 #include "common/app_base.hpp"
+#include "metrics/metrics_manager.hpp"
+#include "metrics/network_metrics.hpp"
 #include "network/tarcap/packets_handler.hpp"
 #include "network/tarcap/packets_handlers/interface/sync_packet_handler.hpp"
 #include "network/tarcap/packets_handlers/latest/dag_block_packet_handler.hpp"
@@ -114,6 +116,9 @@ std::string TaraxaCapability::packetTypeToString(unsigned _packetType) const {
 
 void TaraxaCapability::interpretCapabilityPacket(std::weak_ptr<dev::p2p::Session> session, unsigned _id,
                                                  dev::RLP const &_r) {
+  metrics::MetricsManager::instance()
+      .getMetrics<metrics::NetworkMetrics>()
+      .incrementCounter<metrics::NetworkMetrics::Counters::PacketsTotal>();
   const auto session_p = session.lock();
   if (!session_p) {
     LOG(log_er_) << "Unable to obtain session ptr !";
@@ -134,12 +139,18 @@ void TaraxaCapability::interpretCapabilityPacket(std::weak_ptr<dev::p2p::Session
   // and received initial status packet
   const auto peer = peers_state_->getPacketSenderPeer(node_id, packet_type);
   if (!peer.first) [[unlikely]] {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedEarly>();
     LOG(log_wr_) << "Unable to push packet into queue. Reason: " << peer.second;
     host->disconnect(node_id, dev::p2p::UserReason);
     return;
   }
 
   if (pbft_syncing_state_->isDeepPbftSyncing() && filterSyncIrrelevantPackets(packet_type)) {
+    metrics::MetricsManager::instance()
+        .getMetrics<metrics::NetworkMetrics>()
+        .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedSyncing>();
     LOG(log_dg_) << "Ignored " << convertPacketTypeToString(packet_type) << " because we are still syncing";
     return;
   }
@@ -158,6 +169,9 @@ void TaraxaCapability::interpretCapabilityPacket(std::weak_ptr<dev::p2p::Session
     if (current_time_period <= kConf.network.ddos_protection.packets_stats_time_period_ms) {
       // Peer exceeded max allowed processing time for his packets
       if (peer_packets_stats.processing_duration_ > kConf.network.ddos_protection.peer_max_packets_processing_time_us) {
+        metrics::MetricsManager::instance()
+            .getMetrics<metrics::NetworkMetrics>()
+            .incrementCounter<metrics::NetworkMetrics::Counters::PacketsDroppedProcessingHigh>();
         LOG(log_er_) << "Ignored " << convertPacketTypeToString(packet_type) << " from " << node_id
                      << ". Peer's current packets processing time " << peer_packets_stats.processing_duration_.count()
                      << " us, max allowed processing time "
